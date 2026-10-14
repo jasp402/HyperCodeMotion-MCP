@@ -1,52 +1,63 @@
 # HyperCodeMotion MCP
 
-Public Model Context Protocol (MCP) integration for [HyperCodeMotion](https://hypercodemotion.com).
+**Open-source, read-only Model Context Protocol server** for [HyperCodeMotion](https://hypercodemotion.com).
 
-**Status:** Stateless JSON-RPC MCP endpoint deployed on Vercel; live interoperability tests and custom DNS activation still pending. Validation is a source-pinned structural preflight, not full Studio render validation.
+- **MCP endpoint:** https://mcp.hypercodemotion.com/mcp
+- **Current tools:** `get_capabilities`, `validate_json`
+- **Formats recognized:** composition (`layers`), design (`elements`), improvement patch (`add`, `change`, `remove`, `sfx`)
+- **Deployment:** GitHub main → Vercel; production smoke checks run in GitHub Actions
 
-## Goal
+## What it does and does not do
 
-Provide an open, independently deployed MCP server so compatible AI clients can discover HyperCodeMotion capabilities, create editable motion projects, and validate compositions **against the same rules used by HyperCodeMotion Studio**.
+The current service checks JSON structure and compares layer properties/effect IDs to a **source-pinned snapshot** of HyperCodeMotion Studio's supported features. Validation is preliminary and results explicitly indicate `fullyValidated: false`.
 
-## Planned tools
+The current service **does not** create or persist projects, modify Studio, export video, render animations, or guarantee that a passing JSON will work visually in Studio. Proposed future tools are not yet available.
 
-| Tool | Purpose |
+## Connect
+
+Configure a compatible MCP client with the remote endpoint:
+
+```text
+https://mcp.hypercodemotion.com/mcp
+```
+
+The server responds to HTTP POST JSON-RPC messages; browsing to the URL with GET returns `{"error":"POST required"}`, which is expected.
+
+## Available tools
+
+| Name | What it provides |
 | --- | --- |
-| `get_capabilities` | Read supported layer types, properties, FX presets and schema version |
-| `validate_composition` | Preflight composition (`layers`), design (`elements`), or improvement (`add/change/remove/sfx`) JSON; return errors and warnings |
-| `create_project` | Create a new editable project (later stage) |
-| `apply_ops` | Modify layers, keyframes and scenes through patches (later stage) |
-| `get_project` | Get an existing project summary (later stage) |
+| `get_capabilities` | Snapshot of supported layer types, properties, effect preset slots and source identifiers |
+| `validate_json` | Structural check of a JSON object or JSON string, with warnings/errors; optionally supply the existing composition for improvement patches |
 
-The current implementation is **structural preflight only**, not an MCP endpoint or a guarantee of Studio acceptance. `validateComposition(input, { composition? })` returns `format`, `valid`, `fullyValidated: false`, `errors`, and `warnings`. Pass the original project to check improvement references and duration. Full validation must call the exact Studio normalization/merge path before returning `fullyValidated: true`.
+## Testing
 
-## Source of truth
+```bash
+npm test
+npm run test:live
+```
 
-The Studio source currently defines:
-- `packages/core/src/types.ts` — composition and layer types.
-- `packages/core/src/schema.ts` — layer property schema.
-- `packages/core/src/prompt.ts` — `importAny()` normalization (accepts `layers` compositions and `elements` designs).
-- `packages/core/src/improve.ts` — `applyImprovement()` for `add`, `change`, `remove`, `sfx` against an existing composition.
+GitHub Actions runs unit tests and a separate production smoke test. Neither the unit tests nor the smoke test guarantee full Studio rendering compatibility.
 
-The MCP **must not duplicate or improvise** a separately maintained validation schema. The integration will use a **version-pinned, independently distributable contract/validator package**, or a generated schema artifact plus shared validation logic, subject to checking how the existing private core can be packaged safely. A normalized output is not automatically proof that the input was valid; strict validation must flag coercions, discarded fields and broken references.
+## Privacy, Terms & Support
 
-## Security and deployment principles
+The following apply **only to this MCP service**, not HyperCodeMotion Studio:
 
-- Separate GitHub repository and Vercel project from Studio.
-- Production deployment: `https://hypercodemotion-mcp-service.vercel.app/mcp` (HTTP POST). Custom endpoint planned: `https://mcp.hypercodemotion.com/mcp` (**DNS not yet configured**).
-- Read-only validation can be public, with input size and rate limits. Mutating operations require authentication and authorization.
-- Never load or execute arbitrary user-provided JS from `code`, `component`, `html` or expressions as part of JSON structural validation.
-- Fail closed if the correct contract version is unavailable.
-- No API keys, tokens or private source code committed to this repository.
+- [Privacy Policy](PRIVACY.md)
+- [Terms of Service](TERMS.md)
+- [Support](SUPPORT.md)
 
-## Usage\n\nThis is a stateless Streamable HTTP MCP server. The tools currently available are `get_capabilities` and `validate_json`. Pass the original `composition` as context when preflighting `improvement` operations. The `fullyValidated` field is always `false` until the actual Studio normalization/merge functions can be reused safely. Never interpret `valid: true` alone as a guarantee of import or rendering.\n\nRun locally with `npm test`. The `api/mcp.js` handler is deployed on Vercel through the `/mcp` rewrite. The catalog is a **snapshot**, not a live sync; regenerate/review it when Studio changes.\n\n## Roadmap
+Support: [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Issues are public; never share sensitive project data or access tokens.
 
-1. Verify and formalize the Studio contract/validator sharing boundary.
-2. Implement strict validation and tests with valid/invalid Studio fixtures.
-3. Expose MCP tools via Streamable HTTP.
-4. Deploy independently to Vercel; configure DNS and access protection.
-5. Publish client setup instructions and register in MCP directories.
+## Source and license
 
-## License
+The catalog snapshot was derived from Studio source files including `packages/core/src/schema.ts` and `packages/core/src/presets.ts`. The MCP repository does not modify Studio. Snapshot updates must be reviewed when Studio changes.
 
-Apache-2.0. See [LICENSE](LICENSE).
+Source code is available under [Apache License 2.0](LICENSE). The hosted MCP service is separately subject to the [Terms of Service](TERMS.md).
+
+## Roadmap (not yet implemented)
+
+- Verify full import/merge compatibility using the Studio rules, rather than structural checks alone.
+- Improve validation and developer documentation.
+- Implement authenticated project operations if the product requires them.
+- Prepare for applicable public MCP/plugin directory review.
