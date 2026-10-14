@@ -13,12 +13,12 @@ Provide an open, independently deployed MCP server so compatible AI clients can 
 | Tool | Purpose |
 | --- | --- |
 | `get_capabilities` | Read supported layer types, properties, FX presets and schema version |
-| `validate_composition` | Validate composition / design JSON; return actionable errors and warnings |
+| `validate_composition` | Preflight composition (`layers`), design (`elements`), or improvement (`add/change/remove/sfx`) JSON; return errors and warnings |
 | `create_project` | Create a new editable project (later stage) |
 | `apply_ops` | Modify layers, keyframes and scenes through patches (later stage) |
 | `get_project` | Get an existing project summary (later stage) |
 
-The **first implementation milestone** is read-only capability discovery and accurate validation; project storage and mutations follow only after that is proven.
+The current implementation is **structural preflight only**, not an MCP endpoint or a guarantee of Studio acceptance. `validateComposition(input, { composition? })` returns `format`, `valid`, `fullyValidated: false`, `errors`, and `warnings`. Pass the original project to check improvement references and duration. Full validation must call the exact Studio normalization/merge path before returning `fullyValidated: true`.
 
 ## Source of truth
 
@@ -26,6 +26,7 @@ The Studio source currently defines:
 - `packages/core/src/types.ts` — composition and layer types.
 - `packages/core/src/schema.ts` — layer property schema.
 - `packages/core/src/prompt.ts` — `importAny()` normalization (accepts `layers` compositions and `elements` designs).
+- `packages/core/src/improve.ts` — `applyImprovement()` for `add`, `change`, `remove`, `sfx` against an existing composition.
 
 The MCP **must not duplicate or improvise** a separately maintained validation schema. The integration will use a **version-pinned, independently distributable contract/validator package**, or a generated schema artifact plus shared validation logic, subject to checking how the existing private core can be packaged safely. A normalized output is not automatically proof that the input was valid; strict validation must flag coercions, discarded fields and broken references.
 
