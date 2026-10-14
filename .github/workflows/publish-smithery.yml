@@ -1,6 +1,12 @@
 name: Publish to Smithery
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - api/mcp.js
+      - src/contract.js
+      - .github/workflows/publish-smithery.yml
   workflow_dispatch:
 
 permissions:
@@ -20,6 +26,24 @@ jobs:
         run: npm test
       - name: Smoke test remote endpoint
         run: npm run test:live
+      - name: Verify production metadata is deployed
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          const url="https://mcp.hypercodemotion.com/mcp";
+          let verified=false;
+          for (let n=0;n<12;n++) {
+            try {
+              const r=await fetch(url,{method:"POST",headers:{"content-type":"application/json","accept":"application/json, text/event-stream"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"tools/list"}),signal:AbortSignal.timeout(10000)});
+              const x=await r.json();
+              const all=x.result?.tools??[];
+              verified=all.length===2&&all.every(t=>t.annotations?.readOnlyHint===true&&t.outputSchema);
+              if(verified)break;
+            }catch(e){console.log("Not ready:",String(e))}
+            await new Promise(resolve=>setTimeout(resolve,15000));
+          }
+          assert.ok(verified,"New MCP tool metadata has not reached production");
+          NODE
       - name: Check Smithery authentication
         env:
           SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
