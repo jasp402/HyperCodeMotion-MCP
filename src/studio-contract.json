@@ -1,0 +1,257 @@
+{
+  "source": "jasp402/HyperCodeMotion",
+  "sourceSchemaSha": "c4088722b2919d164401a944e5a88e633dbbec4b",
+  "sourcePresetsSha": "57593271af877058bd0b9a1b77a063dd013564b7",
+  "generatedAt": "2026-10-13",
+  "types": {
+    "text": [
+      "text",
+      "font",
+      "size",
+      "weight",
+      "color",
+      "align",
+      "tracking",
+      "lineHeight",
+      "stroke",
+      "strokeWidth",
+      "reveal",
+      "anim",
+      "stagger",
+      "animDur",
+      "animEase",
+      "fromY",
+      "fromX",
+      "fromScale",
+      "fromRotation",
+      "fromOpacity",
+      "fromBlur"
+    ],
+    "rect": [
+      "w",
+      "h",
+      "radius"
+    ],
+    "ellipse": [
+      "w",
+      "h"
+    ],
+    "polygon": [
+      "sides",
+      "radius",
+      "inner"
+    ],
+    "particles": [
+      "count",
+      "seed",
+      "emit",
+      "life",
+      "speed",
+      "speedVar",
+      "angle",
+      "spread",
+      "gravity",
+      "drag",
+      "size",
+      "sizeEnd",
+      "colorA",
+      "colorB",
+      "shape"
+    ],
+    "image": [
+      "asset",
+      "src",
+      "w",
+      "h",
+      "radius",
+      "reveal"
+    ],
+    "code": [
+      "w",
+      "h",
+      "color",
+      "amount"
+    ],
+    "component": [
+      "use",
+      "w",
+      "h"
+    ],
+    "svg": [
+      "icon",
+      "asset",
+      "w",
+      "h",
+      "color",
+      "tint",
+      "strokeScale",
+      "trimStart",
+      "trimEnd"
+    ],
+    "camera": [
+      "x",
+      "y",
+      "zoom",
+      "rotation",
+      "shake",
+      "follow",
+      "fill",
+      "maxZoom",
+      "lag"
+    ],
+    "ui": [
+      "kind",
+      "text",
+      "sub",
+      "icon",
+      "items",
+      "data",
+      "prefix",
+      "value",
+      "grab",
+      "on",
+      "index",
+      "hover",
+      "typed",
+      "active",
+      "enter",
+      "draw",
+      "total",
+      "w",
+      "h",
+      "inset",
+      "color",
+      "accent",
+      "knob",
+      "font",
+      "size",
+      "weight",
+      "stroke"
+    ],
+    "html": [
+      "doc",
+      "part",
+      "text",
+      "dx",
+      "dy",
+      "reveal",
+      "w",
+      "h",
+      "lx",
+      "ax",
+      "ds",
+      "dox",
+      "doy",
+      "ly"
+    ],
+    "cursor": [
+      "x",
+      "y",
+      "down",
+      "size",
+      "color",
+      "constant",
+      "opacity",
+      "scale",
+      "rotation",
+      "scaleX",
+      "scaleY",
+      "depth"
+    ]
+  },
+  "presets": {
+    "fade": [
+      "in",
+      "out"
+    ],
+    "rise": [
+      "in",
+      "out"
+    ],
+    "slide": [
+      "in",
+      "out"
+    ],
+    "pop": [
+      "in",
+      "out"
+    ],
+    "wipe": [
+      "in",
+      "out"
+    ],
+    "zoom": [
+      "in",
+      "out"
+    ],
+    "drop": [
+      "in",
+      "out"
+    ],
+    "blur": [
+      "in",
+      "out"
+    ],
+    "swap": [
+      "in",
+      "out"
+    ],
+    "spin": [
+      "in",
+      "out"
+    ],
+    "type": [
+      "in",
+      "out"
+    ],
+    "letters": [
+      "in"
+    ],
+    "words": [
+      "in"
+    ],
+    "draw": [
+      "in",
+      "out"
+    ],
+    "float": [
+      "loop"
+    ],
+    "pulse": [
+      "loop"
+    ],
+    "rotate": [
+      "loop"
+    ],
+    "sway": [
+      "loop"
+    ],
+    "shake": [
+      "loop"
+    ],
+    "heartbeat": [
+      "loop"
+    ],
+    "blink": [
+      "loop"
+    ],
+    "breathe": [
+      "loop"
+    ],
+    "glow": [
+      "style"
+    ],
+    "shadow": [
+      "style"
+    ],
+    "lift": [
+      "style"
+    ],
+    "outline": [
+      "style"
+    ],
+    "neon": [
+      "style"
+    ]
+  }
+}
