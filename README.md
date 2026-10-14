@@ -2,7 +2,7 @@
 
 Public Model Context Protocol (MCP) integration for [HyperCodeMotion](https://hypercodemotion.com).
 
-**Status:** Initial architecture / implementation pending. No public MCP endpoint or JSON validation service is available yet.
+**Status:** Stateless JSON-RPC MCP endpoint deployed on Vercel; live interoperability tests and custom DNS activation still pending. Validation is a source-pinned structural preflight, not full Studio render validation.
 
 ## Goal
 
@@ -33,13 +33,13 @@ The MCP **must not duplicate or improvise** a separately maintained validation s
 ## Security and deployment principles
 
 - Separate GitHub repository and Vercel project from Studio.
-- Proposed endpoint: `https://mcp.hypercodemotion.com/mcp` (**not yet deployed**).
+- Production deployment: `https://hypercodemotion-mcp-service.vercel.app/mcp` (HTTP POST). Custom endpoint planned: `https://mcp.hypercodemotion.com/mcp` (**DNS not yet configured**).
 - Read-only validation can be public, with input size and rate limits. Mutating operations require authentication and authorization.
 - Never load or execute arbitrary user-provided JS from `code`, `component`, `html` or expressions as part of JSON structural validation.
 - Fail closed if the correct contract version is unavailable.
 - No API keys, tokens or private source code committed to this repository.
 
-## Roadmap
+## Usage\n\nThis is a stateless Streamable HTTP MCP server. The tools currently available are `get_capabilities` and `validate_json`. Pass the original `composition` as context when preflighting `improvement` operations. The `fullyValidated` field is always `false` until the actual Studio normalization/merge functions can be reused safely. Never interpret `valid: true` alone as a guarantee of import or rendering.\n\nRun locally with `npm test`. The `api/mcp.js` handler is deployed on Vercel through the `/mcp` rewrite. The catalog is a **snapshot**, not a live sync; regenerate/review it when Studio changes.\n\n## Roadmap
 
 1. Verify and formalize the Studio contract/validator sharing boundary.
 2. Implement strict validation and tests with valid/invalid Studio fixtures.
