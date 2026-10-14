@@ -80,7 +80,7 @@ export function validateComposition(input, options = {}) {
   function report() {
     return {
       valid: errors.length === 0,
-      format: hasLayers ? "composition" : hasElements ? "design" : "unknown",
+      format: obj(input) && Array.isArray(input.layers) ? "composition" : obj(input) && Array.isArray(input.elements) ? "design" : "unknown",
       fullyValidated: false,
       mode: "structural-preflight",
       errors,
