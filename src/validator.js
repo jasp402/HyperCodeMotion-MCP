@@ -7,7 +7,7 @@ const obj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
 const finite = (x) => typeof x === "number" && Number.isFinite(x);
 const issue = (path, code, message) => ({ path, code, message });
 
-export function validateComposition(input) {
+export function validateComposition(input, options = {}) {
   const errors = [];
   const warnings = [];
   const fail = (path, code, message) => errors.push(issue(path, code, message));
@@ -16,8 +16,15 @@ export function validateComposition(input) {
     fail("$", "INVALID_ROOT", "Expected a JSON object.");
     return report();
   }
+  const hasImprovement = ["add", "change", "remove", "sfx"].some(k => Object.hasOwn(input, k));
   const hasLayers = Array.isArray(input.layers);
   const hasElements = Array.isArray(input.elements);
+  if (hasImprovement && !hasLayers && !hasElements) {
+    return validateImprovement(input, options);
+  }
+  if (hasImprovement && (hasLayers || hasElements)) {
+    fail("$", "AMBIGUOUS_FORMAT", "Do not mix improvement operations with compositions or designs.");
+  }
   if (!hasLayers && !hasElements) {
     fail("$", "MISSING_CONTENT", 'Missing "layers" (composition) or "elements" (design).');
     return report();
@@ -73,10 +80,98 @@ export function validateComposition(input) {
   function report() {
     return {
       valid: errors.length === 0,
+      format: hasLayers ? "composition" : hasElements ? "design" : "unknown",
       fullyValidated: false,
       mode: "structural-preflight",
       errors,
       warnings,
     };
   }
+}
+
+/**
+ * Preflight for the Studio "Mejorar con IA" operations format.
+ * Compatible with the envelope accepted by packages/core/src/improve.ts,
+ * but actual acceptance is decided by applyImprovement(comp, patch).
+ * No code or expressions are executed here.
+ */
+export function validateImprovement(input, { composition } = {}) {
+  const errors = [];
+  const warnings = [];
+  const fail = (path, code, message) => errors.push(issue(path, code, message));
+  const warn = (path, code, message) => warnings.push(issue(path, code, message));
+  const report = () => ({
+    valid: errors.length === 0,
+    format: "improvement",
+    fullyValidated: false,
+    mode: "structural-preflight",
+    errors,
+    warnings,
+  });
+  if (!obj(input)) {
+    fail("$", "INVALID_ROOT", "Expected a JSON object.");
+    return report();
+  }
+  const keys = ["add", "change", "remove", "sfx"];
+  if (!keys.some(k => Object.hasOwn(input, k))) {
+    fail("$", "MISSING_OPERATIONS", "Expected at least one improvement operation.");
+    return report();
+  }
+  for (const key of keys) {
+    if (input[key] !== undefined && !Array.isArray(input[key])) {
+      fail(`$.${key}`, "INVALID_OPERATIONS", `"${key}" must be an array.`);
+    }
+  }
+  const add = Array.isArray(input.add) ? input.add : [];
+  const change = Array.isArray(input.change) ? input.change : [];
+  const remove = Array.isArray(input.remove) ? input.remove : [];
+  const sfx = Array.isArray(input.sfx) ? input.sfx : [];
+  if (!add.length && !change.length && !remove.length && !sfx.length)
+    fail("$", "EMPTY_OPERATIONS", "No operations to apply.");
+  const existingIds = obj(composition) && Array.isArray(composition.layers)
+    ? new Set(composition.layers.filter(obj).map(l => l.id)) : null;
+  const duration = obj(composition) && finite(composition.duration) ? composition.duration : null;
+  const addedIds = new Set();
+  add.forEach((l, i) => {
+    const p = `$.add[${i}]`;
+    if (!obj(l)) return fail(p, "INVALID_LAYER", "Added layer must be an object.");
+    if (typeof l.id !== "string" || !l.id.trim()) warn(`${p}.id`, "GENERATED_ID", "Studio will generate an id.");
+    else {
+      if (addedIds.has(l.id)) warn(`${p}.id`, "DUPLICATE_ADDED_ID", "Duplicate added id may be normalized.");
+      addedIds.add(l.id);
+      if (existingIds?.has(l.id)) warn(`${p}.id`, "ID_COLLISION", "Studio will rename a colliding new layer.");
+    }
+    if (l.z !== undefined && l.z !== "fondo" && l.z !== "frente")
+      warn(`${p}.z`, "UNKNOWN_Z", 'Only "fondo" and "frente" are meaningful.');
+    if (typeof l.type !== "string" || !l.type) fail(`${p}.type`, "MISSING_TYPE", "New layers require a type.");
+    if (l.type === "image") warn(`${p}.type`, "IGNORED_IMAGE", "Studio discards new image layers in improvements.");
+    if (!obj(l.props)) fail(`${p}.props`, "INVALID_PROPS", "Expected layer props object.");
+    if (!finite(l.start) || !finite(l.end) || l.start < 0 || l.start >= l.end)
+      fail(p, "INVALID_TIMING", "Expected 0 <= start < end.");
+    if (duration !== null && finite(l.end) && l.end > duration)
+      warn(`${p}.end`, "CLAMPED_DURATION", "Studio clamps layers to the original project duration.");
+  });
+  change.forEach((c, i) => {
+    const p = `$.change[${i}]`;
+    if (!obj(c)) return fail(p, "INVALID_CHANGE", "Change must be an object.");
+    if (typeof c.id !== "string" || !c.id) fail(`${p}.id`, "MISSING_ID", "Change requires an existing layer id.");
+    else if (existingIds && !existingIds.has(c.id)) warn(`${p}.id`, "UNKNOWN_CHANGE", "Studio ignores changes to unknown layer ids.");
+    if (c.props !== undefined && !obj(c.props)) fail(`${p}.props`, "INVALID_PROPS", "Expected props object.");
+  });
+  remove.forEach((id, i) => {
+    const p = `$.remove[${i}]`;
+    if (typeof id !== "string" || !id) fail(p, "INVALID_ID", "Removal must reference a layer id.");
+    else if (existingIds && !existingIds.has(id)) warn(p, "UNKNOWN_REMOVE", "Studio ignores unknown layer ids.");
+  });
+  sfx.forEach((sound, i) => {
+    const p = `$.sfx[${i}]`;
+    if (!obj(sound)) return fail(p, "INVALID_SOUND", "SFX must be an object.");
+    if (!finite(sound.t) || sound.t < 0) fail(`${p}.t`, "INVALID_TIME", "SFX time must be nonnegative.");
+    if (typeof sound.sound !== "string" || !sound.sound) fail(`${p}.sound`, "MISSING_SOUND", "SFX requires a sound id.");
+    if (duration !== null && finite(sound.t) && sound.t >= duration)
+      warn(`${p}.t`, "OUTSIDE_DURATION", "SFX may be omitted outside project duration.");
+  });
+  if (!existingIds) warn("$", "PROJECT_CONTEXT_MISSING", "Changes, removals and timing need the existing project for full validation.");
+  warn("$", "CONTRACT_NOT_CHECKED", "Call Studio applyImprovement for exact normalization, presets and rendered output.");
+  return report();
 }
