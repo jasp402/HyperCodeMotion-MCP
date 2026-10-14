@@ -15,7 +15,7 @@ test("accepts a structurally sound Studio composition, without claiming full val
   assert.equal(result.fullyValidated, false);
 });
 test("rejects non-HyperCodeMotion JSON", () => {
-  assert.equal(validateComposition({ add: [] }).errors[0].code, "MISSING_CONTENT");
+  assert.equal(validateComposition({ unrelated: true }).errors[0].code, "MISSING_CONTENT");
 });
 test("rejects duplicate ids and missing parents", () => {
   const c = example();
@@ -37,4 +37,42 @@ test("does not execute expressions or supplied code", () => {
   const c = example(); c.layers[0].props.x = { expr: "throw new Error('oops')" };
   assert.equal(validateComposition(c).valid, true);
   assert.equal(validateComposition(c).fullyValidated, false);
+});
+
+test("recognizes real Studio improvement envelope with add/change/remove/sfx", () => {
+  const patch = {
+    add: [
+      { id: "accent", name: "Accent", type: "svg", z: "frente", start: 0.5, end: 2,
+        props: { icon: "martini", x: 540, y: 300 },
+        fx: { in: { id: "draw", dur: 0.5 } } }
+    ],
+    change: [], remove: [], sfx: [{ t: 0.6, sound: "whoosh", gain: 0.4 }]
+  };
+  const result = validateComposition(patch, { composition: example() });
+  assert.equal(result.valid, true);
+  assert.equal(result.format, "improvement");
+  assert.equal(result.fullyValidated, false);
+});
+test("rejects malformed improvement operation arrays", () => {
+  const result = validateComposition({ add: {}, change: [], remove: [], sfx: [] });
+  assert.ok(result.errors.some(x => x.code === "INVALID_OPERATIONS"));
+});
+test("distinguishes empty improvements from unrelated JSON", () => {
+  assert.equal(validateComposition({ add: [] }).errors[0].code, "EMPTY_OPERATIONS");
+});
+test("checks existing project references when context is supplied", () => {
+  const result = validateComposition({ change: [{ id: "missing", props: { x: 1 } }] }, { composition: example() });
+  assert.ok(result.warnings.some(x => x.code === "UNKNOWN_CHANGE"));
+});
+test("accepts fondo/frente and warns on project-duration clamping", () => {
+  const result = validateComposition({ add: [
+    { id: "bg", type: "rect", z: "fondo", start: 0, end: 8, props: { fill: "#111" } }
+  ] }, { composition: example() });
+  assert.equal(result.valid, true);
+  assert.ok(result.warnings.some(x => x.code === "CLAMPED_DURATION"));
+  assert.ok(!result.warnings.some(x => x.code === "UNKNOWN_Z"));
+});
+test("rejects conflicting top-level formats", () => {
+  const result = validateComposition({ ...example(), add: [] });
+  assert.ok(result.errors.some(x => x.code === "AMBIGUOUS_FORMAT"));
 });
