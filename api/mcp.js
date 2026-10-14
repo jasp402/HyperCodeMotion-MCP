@@ -1,7 +1,7 @@
 import {getCapabilities,validateJson} from "../src/contract.js";
 const tools=[
-{name:"get_capabilities",description:"List supported HyperCodeMotion formats and source-pinned layer/effect rules.",inputSchema:{type:"object",properties:{}}},
-{name:"validate_json",description:"Preflight HyperCodeMotion composition, design or improvement JSON. This does not guarantee render success.",inputSchema:{type:"object",properties:{json:{description:"JSON object or JSON string"},composition:{type:"object",description:"Optional original project for improvement validation"}},required:["json"]}}
+{name:"get_capabilities",title:"HyperCodeMotion Capabilities",description:"List HyperCodeMotion JSON formats, supported layer properties, effects, and Studio contract revisions before creating animations.",annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},inputSchema:{type:"object",properties:{},additionalProperties:false},outputSchema:{type:"object",properties:{contractVersion:{type:"string"},source:{type:"string"},sourceSchemaSha:{type:"string"},sourcePresetsSha:{type:"string"},formats:{type:"array",items:{type:"string"}},layerProperties:{type:"object",additionalProperties:{type:"array",items:{type:"string"}}},presetSlots:{type:"object",additionalProperties:{type:"array",items:{type:"string"}}},fullyValidated:{type:"boolean"}},required:["contractVersion","formats","layerProperties","presetSlots","fullyValidated"]}},
+{name:"validate_json",title:"Validate HyperCodeMotion JSON",description:"Check a composition (layers), design (elements), or improvement patch (add/change/remove/sfx) and return actionable errors and warnings. This is preliminary validation, not proof of a successful render.",annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},inputSchema:{type:"object",properties:{json:{description:"HyperCodeMotion JSON object or JSON-encoded string to validate.",anyOf:[{type:"object"},{type:"string"}]},composition:{type:"object",description:"Optional original composition used to resolve patch references and timings."}},required:["json"],additionalProperties:false},outputSchema:{type:"object",properties:{valid:{type:"boolean"},format:{type:"string"},fullyValidated:{type:"boolean"},mode:{type:"string"},contractVersion:{type:"string"},errors:{type:"array",items:{type:"object",properties:{path:{type:"string"},code:{type:"string"},message:{type:"string"}}}},warnings:{type:"array",items:{type:"object",properties:{path:{type:"string"},code:{type:"string"},message:{type:"string"}}}}},required:["valid","format","fullyValidated","mode","errors","warnings","contractVersion"]}}
 ];
 const reply=(res,status,payload)=>{res.statusCode=status;res.setHeader("Content-Type","application/json");res.setHeader("Cache-Control","no-store");res.end(JSON.stringify(payload));};
 const ok=(id,value)=>({jsonrpc:"2.0",id,result:value});
@@ -20,7 +20,7 @@ export default async function handler(req,res){
  const id=data?.id??null;
  if(data?.jsonrpc!=="2.0"||typeof data.method!=="string")return reply(res,400,err(id,-32600,"Invalid request"));
  if(data.method.startsWith("notifications/")){res.statusCode=202;return res.end();}
- if(data.method==="initialize")return reply(res,200,ok(id,{protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"hypercodemotion-mcp",version:"0.2.0"}}));
+ if(data.method==="initialize")return reply(res,200,ok(id,{protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"hypercodemotion-mcp",title:"HyperCodeMotion MCP",version:"0.2.0",description:"Read-only HyperCodeMotion JSON validation and layer, effect and format discovery for AI animation workflows.",websiteUrl:"https://github.com/jasp402/HyperCodeMotion-MCP"},instructions:"Call get_capabilities before generating animations; then call validate_json. The check is preliminary (fullyValidated=false), not a render guarantee."}));
  if(data.method==="ping")return reply(res,200,ok(id,{}));
  if(data.method==="tools/list")return reply(res,200,ok(id,{tools}));
  if(data.method==="tools/call"){
@@ -29,7 +29,7 @@ export default async function handler(req,res){
   try{
    if(name==="validate_json"&&!Object.hasOwn(args,"json"))return reply(res,200,err(id,-32602,"Missing json"));
    const output=name==="get_capabilities"?getCapabilities():validateJson(typeof args.json==="string"?JSON.parse(args.json):args.json,{composition:args.composition});
-   return reply(res,200,ok(id,{content:[{type:"text",text:JSON.stringify(output)}],isError:false}));
+   return reply(res,200,ok(id,{content:[{type:"text",text:JSON.stringify(output)}],structuredContent:output,isError:false}));
   }catch(e){return reply(res,200,ok(id,{content:[{type:"text",text:String(e.message||e)}],isError:true}));}
  }
  return reply(res,200,err(id,-32601,"Method not found"));
