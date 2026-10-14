@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "name": "Editorial Launch — Reference",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "duration": 6,
+  "background": "#101018",
+  "params": {
+    "accent": "#E8F27A"
+  },
+  "layers": [
+    {
+      "id": "eyebrow",
+      "name": "Section label",
+      "type": "text",
+      "start": 0.1,
+      "end": 5.9,
+      "props": {
+        "text": "MOTION SYSTEM",
+        "x": 540,
+        "y": 580,
+        "size": 44,
+        "color": "#F6F6F5"
+      },
+      "fx": {
+        "in": {
+          "id": "fade",
+          "dur": 0.5,
+          "amount": 1
+        }
+      }
+    },
+    {
+      "id": "headline",
+      "name": "Primary headline",
+      "type": "text",
+      "start": 0.3,
+      "end": 5.9,
+      "props": {
+        "text": "Make it move.",
+        "x": 540,
+        "y": 930,
+        "size": 112,
+        "color": "#E8F27A"
+      },
+      "fx": {
+        "in": {
+          "id": "rise",
+          "dur": 0.6,
+          "amount": 1
+        }
+      }
+    },
+    {
+      "id": "accent_bar",
+      "name": "Accent rule",
+      "type": "rect",
+      "start": 0.5,
+      "end": 5.9,
+      "props": {
+        "x": 540,
+        "y": 1090,
+        "w": 420,
+        "h": 8,
+        "fill": "#E8F27A"
+      },
+      "fx": {
+        "in": {
+          "id": "pop",
+          "dur": 0.5,
+          "amount": 1
+        }
+      }
+    }
+  ]
+}
