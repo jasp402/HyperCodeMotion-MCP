@@ -39,6 +39,12 @@ npm run test:live
 
 GitHub Actions runs unit tests and a separate production smoke test. Neither the unit tests nor the smoke test guarantee full Studio rendering compatibility.
 
+## HyperCodeMotion Creative Skill
+
+The repository also contains the [HyperCodeMotion Agent Skill](skills/hypercodemotion/SKILL.md). It guides AI assistants through **brief → visual references → art direction → scenes → editable JSON → MCP validation → Studio import**. Specialized references explain composition formats, motion, visual design, HTML scene assets and validation. A sample JSON and automated checks are included.
+
+The Skill is available as repository files; publication to external Skill catalogs and installation in individual AI clients are separate future steps. It does not automatically activate merely because the MCP is connected.
+
 ## Privacy, Terms & Support
 
 The following apply **only to this MCP service**, not HyperCodeMotion Studio:
