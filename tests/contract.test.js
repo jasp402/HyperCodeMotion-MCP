@@ -17,3 +17,21 @@ test("MCP initialize, tools/list and validation",async()=>{
   const output=await call("tools/call",{name:"validate_json",arguments:{json}});
   assert.equal(JSON.parse(output.result.content[0].text).valid,true);
 });
+
+test("Smithery metadata includes descriptions, read-only annotations and output schemas",async()=>{
+ const call=async(method)=>{
+   let raw; const response={statusCode:200,setHeader(){},end(x){raw=x}};
+   await handler({method:"POST",headers:{},body:{jsonrpc:"2.0",id:1,method}},response);
+   return JSON.parse(raw).result;
+ };
+ const init=await call("initialize");
+ assert.ok(init.serverInfo.description);
+ assert.ok(init.serverInfo.websiteUrl.startsWith("https://"));
+ const listed=await call("tools/list");
+ for(const tool of listed.tools){
+   assert.equal(tool.annotations.readOnlyHint,true);
+   assert.equal(tool.annotations.destructiveHint,false);
+   assert.ok(tool.outputSchema);
+   assert.ok(tool.title);
+ }
+});
