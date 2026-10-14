@@ -1,0 +1,54 @@
+name: Release HyperCodeMotion Skill
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: skill-release-main
+  cancel-in-progress: false
+
+jobs:
+  release-skill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Run tests
+        run: npm test
+      - name: Package only the skill
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f skills/hypercodemotion/SKILL.md
+          mkdir -p dist
+          cd skills
+          zip -q -r ../dist/hypercodemotion-skill.zip hypercodemotion -x '*/.DS_Store' '*/__MACOSX/*'
+          cd ..
+          unzip -l dist/hypercodemotion-skill.zip
+          unzip -p dist/hypercodemotion-skill.zip hypercodemotion/SKILL.md | grep -q '^name: hypercodemotion$'
+          sha256sum dist/hypercodemotion-skill.zip > dist/SHA256SUMS
+      - name: Publish/update rolling GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="skill-latest"
+          title="HyperCodeMotion Skill — Latest"
+          notes="Automatically packaged from main at commit ${GITHUB_SHA}. Download hypercodemotion-skill.zip and upload it through ChatGPT Skills > Add > Upload from your computer. This release contains only the skill directory, not the MCP server."
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "$title" --notes "$notes" --latest=false
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$title" --notes "$notes" --latest=false
+          fi
+          gh release upload "$tag" dist/hypercodemotion-skill.zip dist/SHA256SUMS --clobber
