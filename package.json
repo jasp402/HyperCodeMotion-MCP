@@ -6,5 +6,8 @@
   "scripts": {
     "test": "node --test",
     "test:live": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.2"
   }
 }

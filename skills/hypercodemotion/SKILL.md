@@ -14,8 +14,8 @@ Use this Skill when asked to create, improve, extend, combine, or troubleshoot e
 3. **Storyboard and scenes** — Create sequential beats with one communicative objective each. Decide which objects persist and transform between beats versus which appear only within one scene. Allocate time to reading and transitions; storyboard timing must fit total duration.
 4. **Composition plan** — Choose native editable layers for shapes/text/particles, HTML documents + individually addressed `data-hcm` parts for editorial/UI layouts, and supported media references for images. Plan layer IDs, order, parent/clip relationships, assets, text, effects, keyframes, audio and scene boundaries.
 5. **JSON generation** — Produce **one complete, standalone composition** with `layers`, or an `elements` design only when specifically requested. For an existing project using “Mejorar con IA”, produce an improvement patch using `add/change/remove/sfx` and preserve unchanged data. Never confuse the patch with a standalone composition.
-6. **MCP validation** — When HyperCodeMotion MCP is connected, call `get_capabilities` before selecting layer/effect fields; call `validate_json` after generation, with the original composition as context for patches. Correct errors, inspect warnings and validate again. **Do not claim validation if no call occurred.**
-7. **Studio handoff** — Return the format required by the target Studio workflow and concise notes only when permitted by the output requirements. Test actual import/render in Studio when possible. Never claim a perfect render from MCP results alone.
+6. **MCP validation** — The HyperCodeMotion MCP (`https://mcp.hypercodemotion.com/mcp`) is required. Call `get_capabilities` before selecting layer/effect fields; `validate_json` is optional for drafts and patches (pass the original composition as context). **Do not claim validation if no call occurred.**
+7. **Studio handoff** — For a full composition, call `create_hcmotion` with the finished JSON. If `created` is false, fix every error and call it again. Give the user the `open` link (opens the project in Studio) and the `download` link, and say both expire in 24 hours. **Never paste the composition JSON for the user to copy:** Studio only opens `.hcmotion` files. If the MCP is not connected, stop and ask the user to connect it instead of returning JSON. Never claim a perfect render from MCP results alone.
 
 ## Always load relevant references
 
@@ -43,6 +43,6 @@ Load only the applicable reference files instead of pasting all reference conten
 
 ## Output contract
 
-Default for **Importar desde prompt**: a single JSON object with `version: 1`, positive dimensions/fps/duration, `background`, `params`, and a nonempty `layers` array. Return one ```json``` block if requested by Studio. For **Mejorar con IA**, use the operation envelope, not `layers` at root. For oversized outputs, offer a downloadable JSON file if the host supports it. Do not put commentary inside JSON.
+Default: a single composition object with `version: 1`, positive dimensions/fps/duration, `background`, `params`, and a nonempty `layers` array, delivered **only through `create_hcmotion`** as a `.hcmotion` link. For **Mejorar con IA**, use the operation envelope, not `layers` at root. Do not put commentary inside JSON.
 
 Before output: confirm requested duration, meaningful visibility of every scene, valid source asset references and correct top-level mode. If validation could not be completed, report that outside the JSON only if the target output format permits.
