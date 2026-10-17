@@ -66,6 +66,16 @@ section{padding:110px 0;border-top:1px solid var(--line)}.section-header{display
 .hero .visual{order:1}
 .hero-rail{order:2}
 }
+
+/* Large editorial type, strictly contained within the text column. */
+@media(min-width:1051px){
+.hero{grid-template-columns:minmax(0,44%) minmax(0,56%);column-gap:clamp(24px,2vw,36px)}
+.hero-copy{width:100%;min-width:0;overflow-wrap:normal}
+.hero h1{font-size:clamp(40px,4.15vw,76px);line-height:1.02;letter-spacing:-.085em;max-width:100%;min-width:0}
+.hero h1 .hero-word{display:block;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.hero .visual{min-width:0;max-width:100%}
+}
+@media(min-width:1051px) and (max-width:1360px){.hero h1{font-size:clamp(38px,4vw,58px)}}
 </style>
 </head>
 <body>
