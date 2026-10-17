@@ -3,11 +3,11 @@
 ## Preflight loop
 
 1. The HyperCodeMotion MCP is required. Call `get_capabilities` before designing layer properties and effects. If it is not connected, ask the user to connect it before generating.
-2. Generate the correct JSON root: complete composition with `layers`, design with `elements`, or improvement patch with `add/change/remove/sfx`.
-3. Call `validate_json` with that JSON. For an improvement patch, include the existing composition as optional `composition` context whenever available.
+2. Generate one complete composition with `layers` at the root.
+3. Optionally call `validate_json` on drafts.
 4. Correct errors and investigate warnings. Validate again after corrections.
-5. For a complete composition, call `create_hcmotion`. If `created` is false, fix the listed errors and call it again. Hand the user the `open` and `download` links (valid 24 hours), never the raw JSON.
-6. Use the intended Studio import mode and review its actual preview and import warnings.
+5. Call `create_hcmotion`. If `created` is false, fix the listed errors and call it again. Hand the user the `open` and `download` links (valid 24 hours), never the raw JSON.
+6. Tell the user to open the `open` link and check the preview; you have not seen the render.
 
 ## What validation proves
 

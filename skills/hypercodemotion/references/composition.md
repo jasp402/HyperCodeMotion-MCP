@@ -1,12 +1,12 @@
 # HyperCodeMotion composition contract
 
-**Source:** HyperCodeMotion Studio `packages/core/src/types.ts`, `prompt.ts`, `improve.ts`. Confirm revisions against MCP `get_capabilities` and repository source; this reference is descriptive, not an exhaustive runtime schema.
+**Source:** HyperCodeMotion Studio `packages/core/src/types.ts` and `prompt.ts`. Confirm revisions against MCP `get_capabilities` and repository source; this reference is descriptive, not an exhaustive runtime schema.
 
-## Three distinct input modes
+## Root format
 
-1. **Complete composition (Importar desde prompt):** root `layers` array. Studio `importAny(raw)` calls `normalizeComposition`.
-2. **Design:** root `elements` array. Studio `importAny(raw)` calls `normalizeDesign` and `fromDesign`. Do not combine with `layers` at root.
-3. **Improvement patch (Mejorar con IA):** `add`, `change`, `remove`, `sfx`. Studio `applyImprovement(existingComposition, patch)` merges with an **existing** project. A patch is not a standalone import.
+The only deliverable is a **complete composition** with a `layers` array at the root, sent to MCP `create_hcmotion`, which validates it and returns `.hcmotion` links. Studio opens `.hcmotion` files only; it has no box to paste JSON.
+
+Studio's core also knows design specs (root `elements`) and improvement patches (`add/change/remove/sfx`), but neither can be packed into a `.hcmotion` file. Don't produce them. To edit an existing project, return the full updated composition.
 
 ### Minimal complete composition
 
@@ -44,20 +44,9 @@ A property value may be fixed (number/string), `{"kf":[{"t":0,"v":0},{"t":1,"v":
 
 Optional composition structures include `scenes` (sequential periods and transitions), `docs` (HTML templates), `assets`, `audio`, `camera`, `params`, `plan`, `markers` and `components`. Do not fabricate structures: inspect Studio code for advanced fields.
 
-## Improvement patch
+## Editing an existing project
 
-```json
-{
-  "add": [
-    {"id":"accent_line","name":"Accent line","type":"rect","start":0.5,"end":2.5,"z":"frente","props":{"x":540,"y":900,"w":500,"h":6,"fill":"#E8F27A"}}
-  ],
-  "change": [],
-  "remove": [],
-  "sfx": []
-}
-```
-
-For patches `z: "fondo" | "frente"` is meaningful; this is **not** the layering model of a standalone composition. Studio can clamp times, rename conflicting IDs and skip unsupported operations. Never silently assume that all changes survive normalization. New image layers have special restrictions under `applyImprovement`; consult Studio before using them.
+Start from the user's composition and return all of it with the changes applied. Keep untouched layers, IDs, docs, assets and audio byte-for-byte; change only what was asked. Keep `start`/`end` and keyframe times inside `duration`. Deliver it through `create_hcmotion` like a new project.
 
 ## Combining projects
 

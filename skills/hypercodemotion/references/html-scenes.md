@@ -16,6 +16,17 @@ Example shape:
 ```
 This fragment is **not** a complete standalone composition by itself. Wrap in the full root format when importing.
 
+A complete, working example lives in [examples/html-scene-launch.json](../examples/html-scene-launch.json).
+
+## Recipe that works in Studio
+
+- One document per scene (`s1`, `s2`…), sized exactly to the canvas: `html,body{width:<W>px;height:<H>px;margin:0;background:transparent}`.
+- Position each piece absolutely and give it `data-hcm`. Add `width:max-content` to text pieces so Studio measures the text, not the full row.
+- One `html` layer for the base (`part: ""`) plus one per part, with staggered `start` times and an `fx.in` entrance (`rise`, `pop`, `fade`…; read the list from `get_capabilities`).
+- Name layers for humans (`s1 · titular`) so they are easy to find in the editor.
+- Load fonts with a Google Fonts `<link>` in the document head.
+- Big headlines: letter-spacing no tighter than `-0.03em`.
+
 ## Choosing layers
 
 Use HTML scenes for precise editorial layouts, dashboards and typographic composition. Use native layers when individual transformations, geometry or effects must stay directly editable. Combine both only with intentional alignment and correct layer order.

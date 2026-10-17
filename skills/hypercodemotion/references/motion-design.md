@@ -21,7 +21,7 @@ Use global-second `kf` for physical changes and exact timing. Preserve property 
 
 ## Sound and rhythm
 
-Map music beats and SFX to actual on-screen events. Do not claim that music or a sample is available unless supplied or supported by Studio. In improvement patches sound operations can live under `sfx`; a full composition has a separate `audio` structure. Confirm its schema in Studio before authoring complex audio.
+Map music beats and SFX to actual on-screen events. Do not claim that music or a sample is available unless supplied or supported by Studio. A composition carries sound in its `audio` structure. Confirm its schema in Studio before authoring complex audio.
 
 ## Render QA
 
