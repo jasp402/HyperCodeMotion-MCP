@@ -9,8 +9,10 @@ export const PUBLIC_URL = process.env.PUBLIC_URL || "https://mcp.hypercodemotion
 export const STUDIO_URL = process.env.STUDIO_URL || "https://app.hypercodemotion.com";
 
 /** Id = creation time (base36) + random part: the route knows the age without a lookup. */
-export const newId = (now = Date.now()) => `${now.toString(36)}-${randomBytes(12).toString("base64url")}`;
-export const validId = id => typeof id === "string" && /^[0-9a-z]{6,12}-[A-Za-z0-9_-]{16}$/.test(id);
+// creation time (base 36) + 48 random bits: short enough for a link, unguessable for its 24 h
+export const newId = (now = Date.now()) => `${now.toString(36)}-${randomBytes(6).toString("base64url")}`;
+// 16-char suffix: links made before ids were shortened
+export const validId = id => typeof id === "string" && /^[0-9a-z]{6,12}-(?:[A-Za-z0-9_-]{8}|[A-Za-z0-9_-]{16})$/.test(id);
 export const createdAt = id => parseInt(id.split("-")[0], 36);
 export const expired = (id, now = Date.now()) => now - createdAt(id) > TTL_MS;
 export const pathOf = id => `files/${id}.hcmotion`;
@@ -39,7 +41,7 @@ export async function saveFile(bytes, now = Date.now()) {
   const id = newId(now);
   await (await store()).put(pathOf(id), bytes);
   const download = `${PUBLIC_URL}/d/${id}`;
-  return { id, download, open: `${STUDIO_URL}/?abrir=${encodeURIComponent(download)}`, expiresAt: new Date(createdAt(id) + TTL_MS).toISOString() };
+  return { id, download, open: `${STUDIO_URL}/?p=${id}`, expiresAt: new Date(createdAt(id) + TTL_MS).toISOString() };
 }
 
 /** Deletes every expired file (cron). Returns how many were removed. */

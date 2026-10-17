@@ -1,0 +1,108 @@
+{
+ "version": 1,
+ "name": "Nimbus · Gancho (ejemplo HTML)",
+ "width": 1920,
+ "height": 1080,
+ "fps": 30,
+ "duration": 3,
+ "background": "#F5F4F0",
+ "params": {
+  "accent": "#2F6BFF"
+ },
+ "docs": {
+  "s1": "<!doctype html><html><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap\"><style>:root{--ink:#101114;--paper:#F5F4F0;--accent:#2F6BFF;--muted:#6E6F78;--line:#E3E1DA}html,body{width:1920px;height:1080px;margin:0;background:transparent;font-family:'Inter Tight',sans-serif;color:var(--ink)}.p{width:max-content}.k{position:absolute;left:160px;top:330px;font:500 24px 'JetBrains Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}.k b{color:var(--accent);font-weight:500}.h{position:absolute;left:160px;top:384px;margin:0;font-size:128px;font-weight:800;letter-spacing:-.03em;line-height:.98}.acc{color:var(--accent)}.card{position:absolute;left:1200px;top:300px;width:560px;height:420px;box-sizing:border-box;padding:40px;border-radius:28px;background:#fff;border:1px solid var(--line);box-shadow:0 30px 60px -30px rgba(16,17,20,.25)}.card .t{font-size:30px;font-weight:700;letter-spacing:-.02em}.card .m{margin-top:8px;font:500 18px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.06em}.card .l{height:14px;border-radius:7px;background:var(--line);margin-top:22px}.chip{position:absolute;left:1240px;top:560px;display:flex;align-items:center;gap:14px;padding:18px 24px;border-radius:18px;background:var(--accent);color:#fff;font-size:24px;font-weight:600;box-shadow:0 18px 40px -18px rgba(47,107,255,.6)}.chip i{width:28px;height:28px;color:#fff}</style></head><body><div class=\"k p\" data-hcm=\"k1\"><b>Nimbus</b> · Notas con IA</div><h1 class=\"h p\" data-hcm=\"h1\">Escribe menos.<br><span class=\"acc\">Recuerda todo.</span></h1><div class=\"card\" data-hcm=\"card\"><div class=\"t\">Reunión de producto</div><div class=\"m\">HOY · 10:30 · 42 MIN</div><div class=\"l\" style=\"width:92%\"></div><div class=\"l\" style=\"width:78%\"></div><div class=\"l\" style=\"width:85%\"></div></div><div class=\"chip p\" data-hcm=\"chip\"><i data-icon=\"sparkles\"></i>Resumen listo · 3 tareas</div></body></html>"
+ },
+ "layers": [
+  {
+   "id": "s1_bg",
+   "name": "s1 · fondo",
+   "type": "html",
+   "start": 0,
+   "end": 3,
+   "props": {
+    "doc": "s1",
+    "part": ""
+   }
+  },
+  {
+   "id": "s1_k1",
+   "name": "s1 · etiqueta",
+   "type": "html",
+   "start": 0.1,
+   "end": 3,
+   "props": {
+    "doc": "s1",
+    "part": "k1"
+   },
+   "fx": {
+    "in": {
+     "id": "rise",
+     "dur": 0.5,
+     "amount": 1
+    }
+   }
+  },
+  {
+   "id": "s1_h1",
+   "name": "s1 · titular",
+   "type": "html",
+   "start": 0.3,
+   "end": 3,
+   "props": {
+    "doc": "s1",
+    "part": "h1"
+   },
+   "fx": {
+    "in": {
+     "id": "rise",
+     "dur": 0.6,
+     "amount": 1
+    }
+   }
+  },
+  {
+   "id": "s1_card",
+   "name": "s1 · nota",
+   "type": "html",
+   "start": 0.6,
+   "end": 3,
+   "props": {
+    "doc": "s1",
+    "part": "card"
+   },
+   "fx": {
+    "in": {
+     "id": "pop",
+     "dur": 0.5,
+     "amount": 1
+    }
+   }
+  },
+  {
+   "id": "s1_chip",
+   "name": "s1 · resumen IA",
+   "type": "html",
+   "start": 1.1,
+   "end": 3,
+   "props": {
+    "doc": "s1",
+    "part": "chip"
+   },
+   "fx": {
+    "in": {
+     "id": "rise",
+     "dur": 0.45,
+     "amount": 1
+    }
+   }
+  }
+ ],
+ "scenes": [
+  {
+   "id": "e1",
+   "name": "Gancho",
+   "start": 0,
+   "end": 3
+  }
+ ]
+}
