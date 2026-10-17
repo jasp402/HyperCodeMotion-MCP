@@ -67,7 +67,7 @@ The server speaks JSON-RPC 2.0 over HTTP POST (`initialize`, `ping`, `tools/list
 
 It is not encrypted: the SHA-256 only detects truncated or edited files. Studio implements the same layout in `packages/core/src/hcmotion.ts`.
 
-Files are served at `https://mcp.hypercodemotion.com/d/<id>/<name>.hcmotion`. After 24 hours the link returns 410.
+Files are served at `https://mcp.hypercodemotion.com/d/<id>` and open in Studio at `https://app.hypercodemotion.com/?p=<id>`. After 24 hours the link returns 410.
 
 ### Deployment settings
 

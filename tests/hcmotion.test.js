@@ -46,10 +46,10 @@ test("create_hcmotion stores the file and returns working links", async () => {
   const out = r.structuredContent;
   assert.equal(r.isError, false);
   assert.equal(out.created, true);
-  assert.match(out.download, /^https:\/\/mcp\.hypercodemotion\.com\/d\/[0-9a-z]+-[\w-]{16}\/pisco-sour\.hcmotion$/);
-  assert.ok(out.open.startsWith("https://app.hypercodemotion.com/?abrir=" + encodeURIComponent(out.download)));
-  const [, id] = out.download.match(/\/d\/([^/]+)\//);
-  const res = await get(id, "pisco-sour.hcmotion");
+  assert.match(out.download, /^https:\/\/mcp\.hypercodemotion\.com\/d\/[0-9a-z]+-[\w-]{8}$/);
+  const [, id] = out.download.match(/\/d\/([^/]+)$/);
+  assert.equal(out.open, `https://app.hypercodemotion.com/?p=${id}`);
+  const res = await get(id);
   assert.equal(res.statusCode, 200);
   assert.match(res.headers["content-disposition"], /pisco-sour\.hcmotion/);
   assert.equal(Buffer.from(res.body).subarray(0, 3).toString(), "HCM");
@@ -76,4 +76,12 @@ test("links die after 24 h and the cron sweeps old files", async () => {
   const res = { setHeader() {}, end() {} };
   await cleanup({ headers: {} }, res);
   assert.equal(res.statusCode, 401);
+});
+
+test("links made before ids were shortened still download", async () => {
+  const id = `${Date.now().toString(36)}-AAAAAAAAAAAAAAAA`;
+  files.set(pathOf(id), await encodeHcmotion(comp()));
+  const res = await get(id, "pisco-sour.hcmotion");
+  assert.equal(res.statusCode, 200);
+  assert.match(res.headers["content-disposition"], /pisco-sour\.hcmotion/);
 });

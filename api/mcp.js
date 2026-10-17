@@ -12,9 +12,7 @@ async function createHcmotion(args){
  if(typeof args.name==="string"&&args.name.trim())json={...json,name:args.name.trim().slice(0,120)};
  const bytes=await encodeHcmotion(json);
  const file=await saveFile(bytes);
- const slug=String(json.name||"proyecto").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,60)||"proyecto";
- const download=`${file.download}/${slug}.hcmotion`;
- return {created:true,download,open:file.open.replace(encodeURIComponent(file.download),encodeURIComponent(download)),expiresAt:file.expiresAt,bytes:bytes.length,errors:[],warnings:report.warnings};
+ return {created:true,download:file.download,open:file.open,expiresAt:file.expiresAt,bytes:bytes.length,errors:[],warnings:report.warnings};
 }
 const tools=[
 {name:"get_capabilities",title:"HyperCodeMotion Capabilities",description:"List the HyperCodeMotion JSON formats, layer types and properties, and effect presets that HyperCodeMotion Studio supports, with the Studio contract revision they come from.",annotations:{title:"HyperCodeMotion Capabilities",readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},inputSchema:{type:"object",properties:{},additionalProperties:false},outputSchema:{type:"object",properties:{contractVersion:{type:"string"},source:{type:"string"},sourceSchemaSha:{type:"string"},sourcePresetsSha:{type:"string"},formats:{type:"array",items:{type:"string"}},layerProperties:{type:"object",additionalProperties:{type:"array",items:{type:"string"}}},presetSlots:{type:"object",additionalProperties:{type:"array",items:{type:"string"}}},fullyValidated:{type:"boolean"}},required:["contractVersion","formats","layerProperties","presetSlots","fullyValidated"]}},
