@@ -26,6 +26,29 @@ section{padding:110px 0;border-top:1px solid var(--line)}.section-header{display
 @media(max-width:900px){.visual{opacity:.45;right:-45%;width:110%}.hero-copy{max-width:95%}.links a:not(.nav-cta){display:none}.section-header{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.flow-step:nth-child(2){border-right:0}.flow-step:nth-child(-n+2){border-bottom:1px solid var(--line)}.tools{grid-template-columns:1fr}.tool{min-height:280px}.setup{grid-template-columns:1fr}.matrix{grid-template-columns:1fr}}
 @media(max-width:560px){.nav{height:67px}.brand{font-size:18px}.brand small{font-size:8px}.nav-cta{padding:10px!important}.hero{min-height:700px;padding-top:65px}.hero h1{font-size:clamp(60px,14vw,86px)}.hero .intro{max-width:95%}.visual{top:25%;right:-66%;width:150%;opacity:.35}.hero-rail{font-size:9px}.flow{grid-template-columns:1fr}.flow-step{border-right:0;border-bottom:1px solid var(--line)!important;min-height:195px}.flow-step strong{margin-top:35px}.flow-step:last-child{border-bottom:0!important}.terminal-body{font-size:11px;padding:17px}.endpoint{align-items:flex-start}.endpoint code{font-size:10px}.section-header h2{font-size:45px}section{padding:75px 0}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}.reveal{will-change:auto}}
+/* Compact documentation hero: keeps first-viewport content visible. */
+.hero{min-height:560px;height:auto;padding-top:58px;padding-bottom:80px;display:grid;grid-template-columns:48% 52%;gap:0;align-items:center}
+.hero-copy{max-width:100%}
+.hero h1{font-size:clamp(43px,5.25vw,78px);margin:18px 0 22px;line-height:.99}
+.hero .intro{font-size:clamp(13px,1.2vw,16px);line-height:1.65;max-width:480px}
+.hero .actions{margin-top:26px}
+.hero .visual{position:relative;right:auto;top:auto;width:100%;height:auto;opacity:1;pointer-events:auto;z-index:3;transform:perspective(1300px) rotateY(-8deg);transform-origin:45% 50%}
+.studio-frame{background:#0e1017;border:1px solid #343848;border-radius:13px;box-shadow:0 30px 100px #0009,0 0 65px #9a70fb1c;padding:13px;overflow:hidden}
+.studio-bar{height:36px;border-bottom:1px solid #333341;display:flex;gap:12px;align-items:flex-start;justify-content:space-between;font:600 9px 'DM Mono',monospace;color:#c0c3cd;white-space:nowrap}
+.studio-bar em{color:#565d6c;font-style:normal;margin:0 4px}.studio-bar b{color:#e8f27a}.studio-online{color:#63c69a}.traffic{display:flex;gap:5px;align-items:center;margin-top:2px}.traffic i{width:8px;height:8px;border-radius:50%;background:#e35d58}.traffic i:nth-child(2){background:#dcae32}.traffic i:nth-child(3){background:#369566}
+.studio-panels{display:grid;grid-template-columns:1.52fr 1fr;gap:12px;padding-top:12px}.studio-left{min-width:0}
+.studio-canvas{position:relative;aspect-ratio:16/9;border-radius:6px;background:#e8f27a;color:#14161b;display:grid;place-items:center;overflow:hidden}.studio-canvas:before{content:'';position:absolute;inset:0;background:linear-gradient(140deg,#f0f88f,#dced72);opacity:.5}
+.studio-message{position:relative;z-index:1;font-size:clamp(11px,1.6vw,23px);font-weight:900;letter-spacing:-.07em;white-space:nowrap}.studio-message span{color:#151619}
+.canvas-corner,.canvas-counter{position:absolute;font:5px 'DM Mono',monospace;opacity:.4;left:8px;top:8px}.canvas-counter{top:auto;bottom:7px;left:auto;right:8px}
+.studio-track{position:relative;height:4px;background:#33343f;margin:15px 5px 12px;border-radius:10px}.track-progress{display:block;width:73%;height:100%;background:#e8f27a;border-radius:10px}.track-playhead{position:absolute;left:73%;top:-5px;width:14px;height:14px;border-radius:50%;background:#111;border:2px solid #fff;box-shadow:0 0 8px #fff}
+.studio-transport{display:flex;justify-content:space-between;color:#a2a4ad;gap:4px;font:8px 'DM Mono',monospace}.studio-transport b{color:#eee}
+.studio-timeline{display:flex;align-items:center;gap:5px;border-top:1px solid #292b39;margin-top:12px;padding-top:11px;font:7px 'DM Mono',monospace;color:#89919b}.timeline-block{background:#8b70b6;border-radius:3px;flex:1;text-align:center;padding:9px 0;color:white}.timeline-block.alt{background:#e8f27a;color:#171717}
+.studio-inspector{background:#0b0d14;border:1px solid #292c38;border-radius:7px;min-width:0;padding:11px;font:9px 'DM Mono',monospace;color:#a0a5b4}.inspector-head{display:flex;justify-content:space-between;gap:5px;color:#eee;font-weight:700;border-bottom:1px solid #262a36;padding-bottom:11px}.inspector-head span{color:#767c8e}.studio-inspector p{font-size:9px;color:#858b9b;margin:13px 0 7px}.studio-inspector p b{float:right;color:#eeae70}.swatches{display:flex;gap:5px}.swatches i{width:17px;height:17px;border-radius:4px;background:#e8f27a}.swatches i:nth-child(2){background:#b9f379}.swatches i:nth-child(3){background:#ac481e}.swatches i:nth-child(4){background:#409571}.swatches i:nth-child(5){background:#7566ad}.swatches i:nth-child(6){background:#ce73a1}
+.mini-slider{height:4px;background:#40434c;border-radius:5px;position:relative}.mini-slider:before{content:'';display:block;height:4px;width:42%;background:#e8f27a}.mini-slider i{position:absolute;left:42%;top:-5px;background:#e8f27a;width:13px;height:13px;border-radius:50%}.fake-input{border:1px solid #303341;padding:7px 6px;border-radius:3px;color:#d2d3dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px}.inspector-box{border:1px solid #292c36;padding:8px;margin-top:13px}.inspector-box strong{color:#e8f27a;font-size:8px}.inspector-box p{margin:8px 0 5px}
+.demo-credit{display:flex;justify-content:space-between;gap:6px;color:#838eae;font:9px 'DM Mono',monospace;letter-spacing:.06em;padding:11px 3px}.demo-credit span{color:var(--lime)}.demo-credit:hover span{text-decoration:underline}
+.hero-rail{bottom:18px}
+@media(max-width:1050px){.hero{grid-template-columns:1fr;gap:30px;padding-top:50px;padding-bottom:65px;min-height:0}.hero .visual{max-width:780px;transform:none}.hero h1{font-size:clamp(45px,9vw,80px)}.hero-rail{position:relative;bottom:auto;left:auto;right:auto;grid-column:1}.studio-message{font-size:clamp(14px,3vw,27px)}}
+@media(max-width:560px){.hero h1{font-size:clamp(43px,11vw,62px)}.hero{padding-bottom:45px;gap:25px}.hero .visual{max-width:100%}.studio-frame{padding:6px;border-radius:7px}.studio-panels{gap:5px;padding-top:6px}.studio-bar{height:24px;font-size:6px;gap:4px}.studio-online{display:none}.studio-inspector{padding:5px;font-size:6px}.inspector-head{font-size:6px;padding-bottom:5px}.studio-inspector p{font-size:6px;margin:7px 0 3px}.swatches{gap:2px}.swatches i{width:10px;height:10px}.mini-slider{height:2px}.mini-slider:before{height:2px}.mini-slider i{height:8px;width:8px;top:-3px}.fake-input{padding:4px;font-size:6px}.inspector-box{margin-top:6px;padding:4px}.inspector-box strong{font-size:6px}.studio-track{margin:10px 2px}.studio-timeline{margin-top:5px;padding-top:6px}.studio-transport{font-size:6px}.demo-credit{font-size:7px;flex-wrap:wrap}.hero-rail{font-size:8px}.studio-message{font-size:clamp(11px,3vw,17px)}}
 </style>
 </head>
 <body>
@@ -33,7 +56,27 @@ section{padding:110px 0;border-top:1px solid var(--line)}.section-header{display
 <header><nav class="nav" aria-label="Main navigation"><a class="brand" href="/" aria-label="HyperCodeMotion MCP home"><span class="mark">H</span>HyperCodeMotion <small>/ MCP</small></a><div class="links"><a href="#workflow">Workflow</a><a href="#tools">Tools</a><a href="#connect">Connect</a><a href="#reference">Reference</a><a class="nav-cta" href="https://app.hypercodemotion.com/" target="_blank" rel="noopener">OPEN STUDIO ↗</a></div></nav></header>
 <main id="main">
 <div class="shell hero">
-<div class="visual" aria-hidden="true"><div class="orb"></div><div class="ring one"></div><div class="ring two"></div><div class="ring three"></div><div class="floating-label">JSON → .HCMOTION<br>VALIDATE / PACKAGE / OPEN</div></div>
+<div class="visual" aria-label="Compact preview of the HyperCodeMotion Studio demo">
+<div class="studio-frame">
+ <div class="studio-bar"><span class="traffic"><i></i><i></i><i></i></span><span>HyperCodeMotion Studio <em>/</em> <b>demo.project.json</b></span><span class="studio-online">● 60 FPS</span></div>
+ <div class="studio-panels">
+  <div class="studio-left">
+   <div class="studio-canvas"><span class="canvas-corner">HYPERCODEMOTION</span><span class="studio-message">TIMELINE <span>REAL.</span></span><span class="canvas-counter">02 / 06</span></div>
+   <div class="studio-track"><span class="track-progress"></span><span class="track-playhead"></span></div>
+   <div class="studio-transport"><span>Ⅱ &nbsp; ↺ &nbsp; ◀ &nbsp; ▶</span><b>00:11.0 / 00:15.0</b><span>1× &nbsp; ↗</span></div>
+   <div class="studio-timeline"><span>S1 &nbsp; PROMPT</span><span class="timeline-block">S2</span><span class="timeline-block alt">S3</span><span class="timeline-block">S4</span></div>
+  </div>
+  <div class="studio-inspector">
+   <div class="inspector-head">⚙ &nbsp; SCENE INSPECTOR <span>JSON ↗</span></div>
+   <p>Global accent</p><div class="swatches"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+   <p>KPI value <b>135%</b></p><div class="mini-slider"><i></i></div>
+   <p>Prompt text (S1)</p><div class="fake-input">Launch animation · 16:9</div>
+   <div class="inspector-box"><strong>LAYER: PROMPT TYPING</strong><p>Entrance effect</p><div class="fake-input">wipe &nbsp;⌄</div><p>Easing curve</p><div class="fake-input">sine.inOut &nbsp;⌄</div></div>
+  </div>
+ </div>
+</div>
+<a class="demo-credit" href="https://www.hypercodemotion.com/#demo" target="_blank" rel="noopener">STUDIO INTERFACE PREVIEW <span>↗ VIEW INTERACTIVE DEMO</span></a>
+</div>
 <div class="hero-copy">
 <div class="eyebrow"><span class="dot"></span> MODEL CONTEXT PROTOCOL · DOCUMENTATION</div>
 <h1><span class="hero-word">AI GENERATES.</span><span class="hero-word gradient-word">YOU STAY</span><span class="hero-word gradient-word">IN CONTROL.</span></h1>
@@ -75,6 +118,6 @@ section{padding:110px 0;border-top:1px solid var(--line)}.section-header{display
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/ScrollTrigger.min.js" defer></script>
 <script>
 document.getElementById('copy').addEventListener('click',async function(){const value=document.getElementById('endpoint').textContent;try{await navigator.clipboard.writeText(value);this.textContent='COPIED ✓';setTimeout(()=>this.textContent='COPY',1900)}catch(e){this.textContent='SELECT URL';const r=document.createRange();r.selectNodeContents(document.getElementById('endpoint'));getSelection().removeAllRanges();getSelection().addRange(r)}});
-window.addEventListener('DOMContentLoaded',()=>{if(!window.gsap||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const gsap=window.gsap;if(window.ScrollTrigger)gsap.registerPlugin(window.ScrollTrigger);gsap.from('.hero-word',{y:110,opacity:0,rotateX:-28,stagger:.13,duration:1.25,ease:'expo.out'});gsap.from('.hero .eyebrow,.hero .intro,.hero .actions',{y:35,opacity:0,stagger:.14,duration:.8,delay:.5,ease:'power3.out'});gsap.to('.orb',{y:-30,x:-24,scale:1.06,duration:6,repeat:-1,yoyo:true,ease:'sine.inOut'});gsap.to('.ring.one',{rotate:50,duration:30,repeat:-1,ease:'none',transformOrigin:'50% 50%'});gsap.to('.ring.two',{rotate:-80,duration:38,repeat:-1,ease:'none',transformOrigin:'50% 50%'});gsap.to('.floating-label',{y:20,rotation:3,duration:3.5,repeat:-1,yoyo:true,ease:'sine.inOut'});if(window.ScrollTrigger)document.querySelectorAll('.reveal').forEach(el=>{gsap.from(el,{scrollTrigger:{trigger:el,start:'top 88%',once:true},y:50,opacity:0,duration:.85,ease:'power3.out'})})});
+window.addEventListener('DOMContentLoaded',()=>{if(!window.gsap||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const gsap=window.gsap;if(window.ScrollTrigger)gsap.registerPlugin(window.ScrollTrigger);gsap.from('.hero-word',{y:110,opacity:0,rotateX:-28,stagger:.13,duration:1.25,ease:'expo.out'});gsap.from('.hero .eyebrow,.hero .intro,.hero .actions',{y:35,opacity:0,stagger:.14,duration:.8,delay:.5,ease:'power3.out'});gsap.from('.studio-frame',{y:38,opacity:0,rotateX:8,duration:1.1,delay:.4,ease:'expo.out'});gsap.to('.studio-message',{opacity:.72,duration:1.7,repeat:-1,yoyo:true,ease:'sine.inOut'});if(window.ScrollTrigger)document.querySelectorAll('.reveal').forEach(el=>{gsap.from(el,{scrollTrigger:{trigger:el,start:'top 88%',once:true},y:50,opacity:0,duration:.85,ease:'power3.out'})})});
 </script>
 </body></html>
