@@ -76,6 +76,17 @@ section{padding:110px 0;border-top:1px solid var(--line)}.section-header{display
 .hero .visual{min-width:0;max-width:100%}
 }
 @media(min-width:1051px) and (max-width:1360px){.hero h1{font-size:clamp(38px,4vw,58px)}}
+
+/* Larger type constrained by its column + atmospheric 3D Studio display. */
+@media(min-width:1051px){
+.hero{grid-template-columns:minmax(0,43%) minmax(0,57%);column-gap:clamp(18px,2vw,36px);perspective:1600px}
+.hero h1{font-size:clamp(50px,4.6vw,83px);line-height:.98;letter-spacing:-.087em;max-width:100%}
+.hero .hero-word{display:block;overflow-wrap:anywhere;word-break:normal}
+.hero .visual{transform:perspective(1400px) rotateY(-12deg) rotateX(4deg);transform-origin:50% 50%;transition:transform .55s cubic-bezier(.2,.8,.2,1);filter:drop-shadow(22px 34px 35px rgba(0,0,0,.42))}
+.hero .visual:hover{transform:perspective(1400px) rotateY(-5deg) rotateX(1deg) translateY(-5px)}
+}
+@media(min-width:1051px) and (max-width:1350px){.hero h1{font-size:clamp(46px,4.3vw,65px)}}
+@media(prefers-reduced-motion:reduce){.hero .visual,.hero .visual:hover{transition:none;transform:none}}
 </style>
 </head>
 <body>
