@@ -8,8 +8,8 @@ export default async function handler(req, res) {
  const id = req.query?.id ?? url.searchParams.get("id");
  const name = String(req.query?.name ?? url.searchParams.get("name") ?? "proyecto.hcmotion").replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "proyecto.hcmotion";
  const gone = msg => { res.statusCode = 410; res.setHeader("Content-Type", "text/plain; charset=utf-8"); res.end(msg); };
- if (req.method !== "GET" && req.method !== "HEAD") { res.statusCode = 405; return res.end(); }
- if (!validId(id)) { res.statusCode = 404; return res.end("Not found"); }
+ if (req.method !== "GET" && req.method !== "HEAD") { res.statusCode = 405; res.setHeader("Allow", "GET, HEAD"); return res.end("Use GET to download this .hcmotion file."); }
+ if (!validId(id)) { res.statusCode = 404; return res.end("This is not a valid .hcmotion download link."); }
  if (expired(id)) return gone("This download link expired (links last 24 hours). Ask Claude to generate the project again.");
  const bytes = await (await store()).get(pathOf(id)).catch(e => { if (e?.name !== "BlobNotFoundError") console.error("hcmotion download failed:", e?.message || e); return null; });
  if (!bytes) return gone("This download link is no longer available. Ask Claude to generate the project again.");

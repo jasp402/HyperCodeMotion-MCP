@@ -1,19 +1,56 @@
 # HyperCodeMotion MCP
 
-**Open-source Model Context Protocol server** for [HyperCodeMotion](https://hypercodemotion.com).
+Connect Claude to [HyperCodeMotion](https://hypercodemotion.com), an editor for data-driven motion graphics. Claude designs the animation; this connector checks it and turns it into a `.hcmotion` project you open in HyperCodeMotion Studio, where you change texts, colors, timing and order yourself instead of asking the AI to regenerate everything.
 
-- **MCP endpoint:** https://mcp.hypercodemotion.com/mcp
-- **Current tools:** `get_capabilities`, `create_hcmotion`, `validate_json`
-- **Formats recognized:** composition (`layers`), design (`elements`), improvement patch (`add`, `change`, `remove`, `sfx`)
-- **Deployment:** GitHub main → Vercel; production smoke checks run in GitHub Actions
+- **MCP endpoint:** `https://mcp.hypercodemotion.com/mcp` (remote, streamable HTTP)
+- **Authentication:** none. The service has no accounts and reads no data from your Claude account.
+- **Studio:** [app.hypercodemotion.com](https://app.hypercodemotion.com)
 
-## What it does and does not do
+## Use it in Claude
 
-The current service checks JSON structure and compares layer properties/effect IDs to a **source-pinned snapshot** of HyperCodeMotion Studio's supported features. Validation is preliminary and results explicitly indicate `fullyValidated: false`.
+1. In Claude, open **Settings → Connectors** and choose **Add custom connector**.
+2. Name it `HyperCodeMotion` and paste `https://mcp.hypercodemotion.com/mcp`.
+3. In a chat, turn the connector on from the tools menu.
+4. Ask for an animation, or paste a prompt copied from HyperCodeMotion Studio («Crear con IA» → «Generar prompt»).
+5. Claude replies with two links:
+   - **Open**: opens the project directly in HyperCodeMotion Studio.
+   - **Download**: the `.hcmotion` file, which you can also open from the Studio home screen («Cargar proyecto»).
 
-`create_hcmotion` is the required last step of every animation: it validates the composition and turns it into a `.hcmotion` project file, the only format HyperCodeMotion Studio opens. The file is kept for **24 hours** in a private Vercel Blob store and served at `https://mcp.hypercodemotion.com/d/<id>/<name>.hcmotion`; after that the link returns 410 and a daily cron deletes it.
+Both links expire **24 hours** after they are created. Save the project from Studio (Archivo → Guardar proyecto) to keep it.
 
-The service does **not** keep projects beyond that window, modify Studio, export video, render animations, or guarantee that a passing JSON will work visually in Studio.
+### Example prompts
+
+- *“Create a 15-second vertical launch video for Nimbus, a note-taking app with AI, and give me the HyperCodeMotion project.”*
+- *“Make a 10-second explainer with three steps for brewing pour-over coffee, 16:9, and package it for HyperCodeMotion.”*
+- *“Which layer types and effects does HyperCodeMotion support?”*
+
+## Tools
+
+| Tool | What it does | Annotations |
+| --- | --- | --- |
+| `get_capabilities` | Lists the formats, layer types, layer properties and effect presets that Studio supports, with the Studio revision they come from. | read-only |
+| `create_hcmotion` | Validates a finished composition and packages it as a `.hcmotion` file. Invalid input returns `created: false` with the errors to fix and stores nothing. Valid input returns `open` and `download` links (24 h). | write (creates a temporary file), not destructive |
+| `validate_json` | Checks a composition, design or improvement patch and returns errors and warnings. Preliminary: it does not prove a correct render. | read-only |
+
+The connector does **not** render video, generate images, audio or video with AI models, or access anything outside the request it receives.
+
+## Data and privacy
+
+- `get_capabilities` and `validate_json` store nothing.
+- `create_hcmotion` stores the generated file in a private Vercel Blob store. Anyone with the link can download it until it expires after 24 hours; a daily job deletes expired files (at most about 48 hours after creation).
+- No accounts, cookies, tracking or AI training on your content.
+
+Full details: [Privacy Policy](PRIVACY.md) · [Terms of Service](TERMS.md) · [Support](SUPPORT.md)
+
+## Support
+
+Open a [GitHub issue](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Issues are public: never post passwords, tokens or confidential project content.
+
+## For developers
+
+### Protocol
+
+The server speaks JSON-RPC 2.0 over HTTP POST (`initialize`, `ping`, `tools/list`, `tools/call`). A GET on the endpoint returns 405 with a short explanation, which is expected. Request bodies are limited to 4 MB.
 
 ### `.hcmotion` layout
 
@@ -30,64 +67,31 @@ The service does **not** keep projects beyond that window, modify Studio, export
 
 It is not encrypted: the SHA-256 only detects truncated or edited files. Studio implements the same layout in `packages/core/src/hcmotion.ts`.
 
+Files are served at `https://mcp.hypercodemotion.com/d/<id>/<name>.hcmotion`. After 24 hours the link returns 410.
+
 ### Deployment settings
 
 - A **private Blob store** connected to the Vercel project. It authenticates through OIDC (`BLOB_STORE_ID` + the project's OIDC token); a `BLOB_READ_WRITE_TOKEN` also works.
 - `CRON_SECRET` so only Vercel Cron can call `/api/cleanup`.
 - Optional `PUBLIC_URL` / `STUDIO_URL` (default `https://mcp.hypercodemotion.com` / `https://app.hypercodemotion.com`).
 
-## Connect
-
-Configure a compatible MCP client with the remote endpoint:
-
-```text
-https://mcp.hypercodemotion.com/mcp
-```
-
-The server responds to HTTP POST JSON-RPC messages; browsing to the URL with GET returns `{"error":"POST required"}`, which is expected.
-
-## Available tools
-
-| Name | What it provides |
-| --- | --- |
-| `get_capabilities` | Snapshot of supported layer types, properties, effect preset slots and source identifiers |
-| `create_hcmotion` | Validates a full composition and returns `open` (opens it in Studio) and `download` links to the `.hcmotion` file, valid 24 hours. If `created` is false, `errors` says what to fix |
-| `validate_json` | Structural check of a JSON object or JSON string, with warnings/errors; optionally supply the existing composition for improvement patches |
-
-## Testing
+### Testing
 
 ```bash
-npm test
-npm run test:live
+npm test          # unit and integration tests
+npm run test:live # smoke test against production
 ```
 
-GitHub Actions runs unit tests and a separate production smoke test. Neither the unit tests nor the smoke test guarantee full Studio rendering compatibility.
+GitHub Actions runs both. Neither guarantees full Studio rendering compatibility.
 
-## HyperCodeMotion Creative Skill
+### Capabilities snapshot
 
-The repository also contains the [HyperCodeMotion Agent Skill](skills/hypercodemotion/SKILL.md). It guides AI assistants through **brief → visual references → art direction → scenes → editable JSON → MCP validation → Studio import**. Specialized references explain composition formats, motion, visual design, HTML scene assets and validation. A sample JSON and automated checks are included.
+The catalog is derived from Studio source files (`packages/core/src/schema.ts`, `packages/core/src/presets.ts`) and must be reviewed when Studio changes.
 
-The Skill is available as repository files; publication to external Skill catalogs and installation in individual AI clients are separate future steps. It does not automatically activate merely because the MCP is connected.
+### HyperCodeMotion Creative Skill
 
-## Privacy, Terms & Support
+The repository also contains the [HyperCodeMotion Agent Skill](skills/hypercodemotion/SKILL.md), which guides AI assistants from brief to art direction, scenes, editable JSON and the `.hcmotion` handoff. It is distributed separately from the connector and does not activate just because the connector is connected.
 
-The following apply **only to this MCP service**, not HyperCodeMotion Studio:
+## License
 
-- [Privacy Policy](PRIVACY.md)
-- [Terms of Service](TERMS.md)
-- [Support](SUPPORT.md)
-
-Support: [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Issues are public; never share sensitive project data or access tokens.
-
-## Source and license
-
-The catalog snapshot was derived from Studio source files including `packages/core/src/schema.ts` and `packages/core/src/presets.ts`. The MCP repository does not modify Studio. Snapshot updates must be reviewed when Studio changes.
-
-Source code is available under [Apache License 2.0](LICENSE). The hosted MCP service is separately subject to the [Terms of Service](TERMS.md).
-
-## Roadmap (not yet implemented)
-
-- Verify full import/merge compatibility using the Studio rules, rather than structural checks alone.
-- Improve validation and developer documentation.
-- Implement authenticated project operations if the product requires them.
-- Prepare for applicable public MCP/plugin directory review.
+Source code: [Apache License 2.0](LICENSE). The hosted service is subject to the [Terms of Service](TERMS.md). HyperCodeMotion names and logos are not licensed by the software license.

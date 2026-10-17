@@ -1,13 +1,20 @@
 # HyperCodeMotion MCP — Privacy Policy
 
-**Effective date:** October 13, 2026  
+**Effective date:** October 17, 2026 (first version: October 13, 2026)  
 **Scope:** The public HyperCodeMotion MCP service at [mcp.hypercodemotion.com](https://mcp.hypercodemotion.com/mcp), not HyperCodeMotion Studio.
 
 ## 1. Service and operator
 HyperCodeMotion MCP is a public Model Context Protocol (MCP) service maintained through the [HyperCodeMotion-MCP GitHub repository](https://github.com/jasp402/HyperCodeMotion-MCP). Privacy inquiries may be submitted through [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Do not include secrets or personal data in public issues.
 
+## Summary
+- **What we collect:** only what your AI client sends to a tool (animation JSON) and standard request metadata handled by our host.
+- **What we store:** nothing for `get_capabilities` and `validate_json`; for `create_hcmotion`, the generated `.hcmotion` file, for at most about 48 hours.
+- **Who we share it with:** our hosting provider (Vercel) only. No sale, advertising, tracking cookies, or AI training.
+- **Accounts:** none. The service never reads your Claude account, chat history, memory, or files.
+- **Contact:** [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues).
+
 ## 2. Information processed
-When your MCP client calls the service, it may send JSON compositions, designs, improvement patches, and optional existing-project context. The service processes those inputs to return compatibility information, errors, warnings, and supported capabilities. **Submitted JSON may include text or other personal information you choose to include.** Avoid sending sensitive information.
+When your MCP client calls the service, it may send JSON compositions, designs, improvement patches, and optional existing-project context. The service receives only the arguments of the tool being called; it does not request or receive your conversation, chat history, memory, or files. The service processes those inputs to return compatibility information, errors, warnings, and supported capabilities. **Submitted JSON may include text or other personal information you choose to include.** Avoid sending sensitive information.
 
 Like other web services, network and infrastructure providers may process technical request data, such as IP addresses, timestamps, request URLs, browser/client identifiers, HTTP status codes, and request IDs.
 
