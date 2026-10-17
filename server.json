@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.jasp402/hypercodemotion-mcp",
   "title": "HyperCodeMotion MCP",
-  "description": "Validate HyperCodeMotion JSON and discover supported layers, properties, and effects.",
-  "version": "0.2.0",
+  "description": "Validate AI-made motion graphics and package them as editable HyperCodeMotion projects.",
+  "version": "0.3.0",
   "repository": {
     "url": "https://github.com/jasp402/HyperCodeMotion-MCP",
     "source": "github"

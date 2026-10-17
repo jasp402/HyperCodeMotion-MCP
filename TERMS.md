@@ -1,13 +1,15 @@
 # HyperCodeMotion MCP — Terms of Service
 
-**Effective date:** October 13, 2026  
+**Effective date:** October 17, 2026 (first version: October 13, 2026)  
 **Scope:** The public HyperCodeMotion MCP service and its tools, **not** HyperCodeMotion Studio.
 
 ## 1. Service
-HyperCodeMotion MCP is a public integration service for discovering supported HyperCodeMotion formats and performing preliminary checks of JSON compositions, designs, and improvement operations. The current public tools are `get_capabilities` and `validate_json`.
+HyperCodeMotion MCP is a public integration service for discovering supported HyperCodeMotion formats, performing preliminary checks of JSON compositions, designs, and improvement operations, and packaging finished compositions as `.hcmotion` project files. The current public tools are `get_capabilities`, `validate_json`, and `create_hcmotion`.
+
+`create_hcmotion` stores the generated file temporarily and returns links to open or download it. The links expire 24 hours after creation and the file is then deleted (see the [Privacy Policy](PRIVACY.md)). The service is not a storage or backup service: save your project from HyperCodeMotion Studio to keep it.
 
 ## 2. Preliminary validation only
-A result marked `valid: true` means the submitted data passed the checks currently implemented by this MCP. It **does not** guarantee that HyperCodeMotion Studio will import, interpret, or render the JSON as intended. Results currently include `fullyValidated: false`. The supported capabilities catalog is a snapshot and may lag behind updates to Studio.
+A result marked `valid: true` (or `created: true`) means the submitted data passed the checks currently implemented by this MCP. It **does not** guarantee that HyperCodeMotion Studio will import, interpret, or render the JSON as intended. Results currently include `fullyValidated: false`. The supported capabilities catalog is a snapshot and may lag behind updates to Studio.
 
 ## 3. Use and restrictions
 You may use the service for legitimate development, learning, and project validation. Do not use it to disrupt availability, bypass security controls, submit malicious traffic, probe other systems without authorization, or infringe others' rights. Do not include credentials or sensitive personal information in JSON submitted to the service.
@@ -37,4 +39,4 @@ Please read the [MCP Privacy Policy](PRIVACY.md).
 We may update these Terms by publishing a new version in this repository. If you do not accept the revised Terms, stop using the service.
 
 ## 12. Support and notices
-See [SUPPORT.md](SUPPORT.md) and [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Do not post personal or confidential information in public issues.
+Contact [jasp402@gmail.com](mailto:jasp402@gmail.com) (also [hypercodemotion@gmail.com](mailto:hypercodemotion@gmail.com)). See also [SUPPORT.md](SUPPORT.md) and [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Do not post personal or confidential information in public issues.

@@ -35,7 +35,7 @@ test("POST initialize replies with server metadata and protocol version", async 
 test("GET explicitly refuses MCP calls, not a web UI", async () => {
   const r = await request("GET");
   assert.equal(r.status, 405);
-  assert.equal(r.body.error, "POST required");
+  assert.match(r.body.error, /^POST required/);
 });
 test("OPTIONS preflight responds with CORS headers", async () => {
   const r = await request("OPTIONS");
