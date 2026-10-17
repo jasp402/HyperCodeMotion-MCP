@@ -32,7 +32,7 @@ It is not encrypted: the SHA-256 only detects truncated or edited files. Studio 
 
 ### Deployment settings
 
-- A **private Blob store** connected to the Vercel project (provides `BLOB_READ_WRITE_TOKEN`).
+- A **private Blob store** connected to the Vercel project. It authenticates through OIDC (`BLOB_STORE_ID` + the project's OIDC token); a `BLOB_READ_WRITE_TOKEN` also works.
 - `CRON_SECRET` so only Vercel Cron can call `/api/cleanup`.
 - Optional `PUBLIC_URL` / `STUDIO_URL` (default `https://mcp.hypercodemotion.com` / `https://app.hypercodemotion.com`).
 
