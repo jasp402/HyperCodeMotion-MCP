@@ -44,7 +44,7 @@ Full details: [Privacy Policy](PRIVACY.md) · [Terms of Service](TERMS.md) · [S
 
 ## Support
 
-Open a [GitHub issue](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Issues are public: never post passwords, tokens or confidential project content.
+Email [jasp402@gmail.com](mailto:jasp402@gmail.com) (also [hypercodemotion@gmail.com](mailto:hypercodemotion@gmail.com)) or open a [GitHub issue](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Issues are public: never post passwords, tokens or confidential project content.
 
 ## For developers
 

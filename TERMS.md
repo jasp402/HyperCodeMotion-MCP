@@ -39,4 +39,4 @@ Please read the [MCP Privacy Policy](PRIVACY.md).
 We may update these Terms by publishing a new version in this repository. If you do not accept the revised Terms, stop using the service.
 
 ## 12. Support and notices
-See [SUPPORT.md](SUPPORT.md) and [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Do not post personal or confidential information in public issues.
+Contact [jasp402@gmail.com](mailto:jasp402@gmail.com) (also [hypercodemotion@gmail.com](mailto:hypercodemotion@gmail.com)). See also [SUPPORT.md](SUPPORT.md) and [GitHub Issues](https://github.com/jasp402/HyperCodeMotion-MCP/issues). Do not post personal or confidential information in public issues.

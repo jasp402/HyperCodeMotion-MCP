@@ -5,7 +5,8 @@ This support page applies only to the **HyperCodeMotion MCP integration**, not t
 ## Official resources
 - **MCP server endpoint:** https://mcp.hypercodemotion.com/mcp
 - **Source, releases, and documentation:** https://github.com/jasp402/HyperCodeMotion-MCP
-- **Support and bug reports:** https://github.com/jasp402/HyperCodeMotion-MCP/issues
+- **Support email:** [jasp402@gmail.com](mailto:jasp402@gmail.com) (also [hypercodemotion@gmail.com](mailto:hypercodemotion@gmail.com))
+- **Bug reports:** https://github.com/jasp402/HyperCodeMotion-MCP/issues
 - **Privacy Policy:** [PRIVACY.md](PRIVACY.md)
 - **Terms of Service:** [TERMS.md](TERMS.md)
 
@@ -29,7 +30,7 @@ This support page applies only to the **HyperCodeMotion MCP integration**, not t
 4. If necessary, provide a **minimal, sanitized** example that reproduces the problem.
 
 ## Requesting help
-Open a [GitHub Issue](https://github.com/jasp402/HyperCodeMotion-MCP/issues/new). Issues are public: **do not post passwords, access tokens, confidential JSON, customer information, or private personal details**. For privacy-related inquiries, open an issue requesting a private contact channel without disclosing the sensitive information itself.
+Open a [GitHub Issue](https://github.com/jasp402/HyperCodeMotion-MCP/issues/new). Issues are public: **do not post passwords, access tokens, confidential JSON, customer information, or private personal details**. For privacy-related or private inquiries, email [jasp402@gmail.com](mailto:jasp402@gmail.com) (also [hypercodemotion@gmail.com](mailto:hypercodemotion@gmail.com)).
 
 ## Expectations
 Support is community-maintained. No guaranteed response or resolution time is offered. For service downtime, also check the [GitHub Actions history](https://github.com/jasp402/HyperCodeMotion-MCP/actions).
