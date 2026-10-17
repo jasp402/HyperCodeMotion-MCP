@@ -49,6 +49,23 @@ section{padding:110px 0;border-top:1px solid var(--line)}.section-header{display
 .hero-rail{bottom:18px}
 @media(max-width:1050px){.hero{grid-template-columns:1fr;gap:30px;padding-top:50px;padding-bottom:65px;min-height:0}.hero .visual{max-width:780px;transform:none}.hero h1{font-size:clamp(45px,9vw,80px)}.hero-rail{position:relative;bottom:auto;left:auto;right:auto;grid-column:1}.studio-message{font-size:clamp(14px,3vw,27px)}}
 @media(max-width:560px){.hero h1{font-size:clamp(43px,11vw,62px)}.hero{padding-bottom:45px;gap:25px}.hero .visual{max-width:100%}.studio-frame{padding:6px;border-radius:7px}.studio-panels{gap:5px;padding-top:6px}.studio-bar{height:24px;font-size:6px;gap:4px}.studio-online{display:none}.studio-inspector{padding:5px;font-size:6px}.inspector-head{font-size:6px;padding-bottom:5px}.studio-inspector p{font-size:6px;margin:7px 0 3px}.swatches{gap:2px}.swatches i{width:10px;height:10px}.mini-slider{height:2px}.mini-slider:before{height:2px}.mini-slider i{height:8px;width:8px;top:-3px}.fake-input{padding:4px;font-size:6px}.inspector-box{margin-top:6px;padding:4px}.inspector-box strong{font-size:6px}.studio-track{margin:10px 2px}.studio-timeline{margin-top:5px;padding-top:6px}.studio-transport{font-size:6px}.demo-credit{font-size:7px;flex-wrap:wrap}.hero-rail{font-size:8px}.studio-message{font-size:clamp(11px,3vw,17px)}}
+
+/* Layout correction: explicit grid ordering, larger right-side preview, no overlap. */
+@media(min-width:1051px){
+.hero{grid-template-columns:minmax(0,40%) minmax(0,60%);column-gap:24px;min-height:0;padding-top:48px;padding-bottom:62px;align-items:center}
+.hero-copy{grid-column:1;grid-row:1;min-width:0;max-width:none;z-index:2}
+.hero .visual{grid-column:2;grid-row:1;position:relative;top:auto;right:auto;width:100%;max-width:none;min-width:0;height:auto;transform:none;z-index:1}
+.hero h1{font-size:clamp(44px,4.2vw,72px);letter-spacing:-.085em;line-height:1.02}
+.hero .intro{max-width:450px}
+.hero-rail{grid-column:1/-1;position:relative;bottom:auto;left:auto;right:auto;margin-top:26px}
+.studio-message{font-size:clamp(18px,1.7vw,30px)}
+}
+@media(max-width:1050px){
+.hero{display:flex;flex-direction:column;align-items:stretch}
+.hero-copy{order:0}
+.hero .visual{order:1}
+.hero-rail{order:2}
+}
 </style>
 </head>
 <body>
