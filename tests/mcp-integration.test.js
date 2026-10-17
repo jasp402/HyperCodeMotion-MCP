@@ -51,9 +51,9 @@ test("MCP ping is available", async () => {
   const r = await request("POST", rpc("ping"));
   assert.deepEqual(r.body.result, {});
 });
-test("tools/list includes read-only catalog and validator", async () => {
+test("tools/list includes catalog, file creator and validator", async () => {
   const r = await request("POST", rpc("tools/list"));
-  assert.deepEqual(r.body.result.tools.map(x=>x.name),["get_capabilities","validate_json"]);
+  assert.deepEqual(r.body.result.tools.map(x=>x.name),["get_capabilities","create_hcmotion","validate_json"]);
 });
 test("get_capabilities returns recognized layer types and fx", async () => {
   const r = await request("POST", tool("get_capabilities",{}));
@@ -114,7 +114,7 @@ test("invalid JSON-RPC envelope fails with -32600",async()=>{
   assert.equal(r.body.error.code,-32600);
 });
 test("explicit oversized content-length is rejected",async()=>{
-  const r=await request("POST",rpc("ping"),{"content-length":"1048577"});
+  const r=await request("POST",rpc("ping"),{"content-length":String(4*1024*1024+1)});
   assert.equal(r.status,413);
 });
 test("structural root and empty operation errors remain distinct",()=>{

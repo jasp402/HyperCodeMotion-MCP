@@ -1,9 +1,9 @@
 # HyperCodeMotion MCP
 
-**Open-source, read-only Model Context Protocol server** for [HyperCodeMotion](https://hypercodemotion.com).
+**Open-source Model Context Protocol server** for [HyperCodeMotion](https://hypercodemotion.com).
 
 - **MCP endpoint:** https://mcp.hypercodemotion.com/mcp
-- **Current tools:** `get_capabilities`, `validate_json`
+- **Current tools:** `get_capabilities`, `create_hcmotion`, `validate_json`
 - **Formats recognized:** composition (`layers`), design (`elements`), improvement patch (`add`, `change`, `remove`, `sfx`)
 - **Deployment:** GitHub main → Vercel; production smoke checks run in GitHub Actions
 
@@ -11,7 +11,30 @@
 
 The current service checks JSON structure and compares layer properties/effect IDs to a **source-pinned snapshot** of HyperCodeMotion Studio's supported features. Validation is preliminary and results explicitly indicate `fullyValidated: false`.
 
-The current service **does not** create or persist projects, modify Studio, export video, render animations, or guarantee that a passing JSON will work visually in Studio. Proposed future tools are not yet available.
+`create_hcmotion` is the required last step of every animation: it validates the composition and turns it into a `.hcmotion` project file, the only format HyperCodeMotion Studio opens. The file is kept for **24 hours** in a private Vercel Blob store and served at `https://mcp.hypercodemotion.com/d/<id>/<name>.hcmotion`; after that the link returns 410 and a daily cron deletes it.
+
+The service does **not** keep projects beyond that window, modify Studio, export video, render animations, or guarantee that a passing JSON will work visually in Studio.
+
+### `.hcmotion` layout
+
+| Offset | Size | Content |
+| --- | --- | --- |
+| 0 | 3 | `HCM` (ASCII) |
+| 3 | 1 | format version (1) |
+| 4 | 1 | flags (bit 0: gzip) |
+| 5 | 3 | reserved (0) |
+| 8 | 4 | JSON size, uncompressed (u32 LE) |
+| 12 | 4 | data size (u32 LE) |
+| 16 | 32 | SHA-256 of the data |
+| 48 | n | composition JSON, gzip |
+
+It is not encrypted: the SHA-256 only detects truncated or edited files. Studio implements the same layout in `packages/core/src/hcmotion.ts`.
+
+### Deployment settings
+
+- A **private Blob store** connected to the Vercel project (provides `BLOB_READ_WRITE_TOKEN`).
+- `CRON_SECRET` so only Vercel Cron can call `/api/cleanup`.
+- Optional `PUBLIC_URL` / `STUDIO_URL` (default `https://mcp.hypercodemotion.com` / `https://app.hypercodemotion.com`).
 
 ## Connect
 
@@ -28,6 +51,7 @@ The server responds to HTTP POST JSON-RPC messages; browsing to the URL with GET
 | Name | What it provides |
 | --- | --- |
 | `get_capabilities` | Snapshot of supported layer types, properties, effect preset slots and source identifiers |
+| `create_hcmotion` | Validates a full composition and returns `open` (opens it in Studio) and `download` links to the `.hcmotion` file, valid 24 hours. If `created` is false, `errors` says what to fix |
 | `validate_json` | Structural check of a JSON object or JSON string, with warnings/errors; optionally supply the existing composition for improvement patches |
 
 ## Testing

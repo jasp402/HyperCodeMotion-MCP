@@ -4,6 +4,20 @@
     {
       "source": "/mcp",
       "destination": "/api/mcp"
+    },
+    {
+      "source": "/d/:id/:name",
+      "destination": "/api/d?id=:id&name=:name"
+    },
+    {
+      "source": "/d/:id",
+      "destination": "/api/d?id=:id"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cleanup",
+      "schedule": "0 4 * * *"
     }
   ]
 }
