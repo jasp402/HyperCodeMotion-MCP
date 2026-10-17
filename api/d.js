@@ -11,7 +11,7 @@ export default async function handler(req, res) {
  if (req.method !== "GET" && req.method !== "HEAD") { res.statusCode = 405; return res.end(); }
  if (!validId(id)) { res.statusCode = 404; return res.end("Not found"); }
  if (expired(id)) return gone("This download link expired (links last 24 hours). Ask Claude to generate the project again.");
- const bytes = await (await store()).get(pathOf(id)).catch(() => null);
+ const bytes = await (await store()).get(pathOf(id)).catch(e => { if (e?.name !== "BlobNotFoundError") console.error("hcmotion download failed:", e?.message || e); return null; });
  if (!bytes) return gone("This download link is no longer available. Ask Claude to generate the project again.");
  res.statusCode = 200;
  res.setHeader("Content-Type", "application/octet-stream");
