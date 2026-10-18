@@ -8,7 +8,7 @@ HyperCodeMotion MCP is a public Model Context Protocol (MCP) service maintained 
 
 ## Summary
 - **What we collect:** only what your AI client sends to a tool (animation JSON) and standard request metadata handled by our host.
-- **What we store:** nothing for `get_capabilities` and `validate_json`; for `create_hcmotion`, the generated `.hcmotion` file, for at most about 48 hours.
+- **What we store:** nothing for `get_capabilities`, `get_template` and `validate_json`; for `create_hcmotion`, the generated `.hcmotion` file, for at most about 48 hours.
 - **Who we share it with:** our hosting provider (Vercel) only. No sale, advertising, tracking cookies, or AI training.
 - **Accounts:** none. The service never reads your Claude account, chat history, memory, or files.
 - **Contact:** [jasp402@gmail.com](mailto:jasp402@gmail.com) (also [hypercodemotion@gmail.com](mailto:hypercodemotion@gmail.com)).
@@ -19,7 +19,7 @@ When your MCP client calls the service, it may send JSON compositions, designs, 
 Like other web services, network and infrastructure providers may process technical request data, such as IP addresses, timestamps, request URLs, browser/client identifiers, HTTP status codes, and request IDs.
 
 ## 3. Storage and retention
-`get_capabilities` and `validate_json` do not persist submitted JSON: they process the request and return results during the same request.
+`get_capabilities`, `get_template` and `validate_json` do not persist submitted JSON: they process the request and return results during the same request.
 
 `create_hcmotion` stores the generated `.hcmotion` file (the submitted composition, compressed) in a private Vercel Blob store so it can be downloaded. Anyone with the link can download it while it is valid. Links expire **24 hours** after creation, and a daily job deletes expired files, so a file may remain stored for up to about 48 hours before deletion. The service creates no user accounts.
 

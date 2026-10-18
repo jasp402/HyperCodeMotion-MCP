@@ -13,7 +13,7 @@ test("MCP initialize, tools/list and validation",async()=>{
     return JSON.parse(body);
   };
   assert.equal((await call("initialize")).result.serverInfo.name,"hypercodemotion-mcp");
-  const listed=await call("tools/list");assert.equal(listed.result.tools.length,3);
+  const listed=await call("tools/list");assert.equal(listed.result.tools.length,4);
   const output=await call("tools/call",{name:"validate_json",arguments:{json}});
   assert.equal(JSON.parse(output.result.content[0].text).valid,true);
 });

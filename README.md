@@ -30,13 +30,14 @@ Both links expire **24 hours** after they are created. Save the project from Stu
 | --- | --- | --- |
 | `get_capabilities` | Lists the formats, layer types, layer properties and effect presets that Studio supports, with the Studio revision they come from. | read-only |
 | `create_hcmotion` | Validates a finished composition and packages it as a `.hcmotion` file. Invalid input returns `created: false` with the errors to fix and stores nothing. Valid input returns `open` and `download` links (24 h). | write (creates a temporary file), not destructive |
+| `get_template` | Returns the full design of a Studio gallery template by its id and format (brief, scenes, HTML scene documents and layers), to use as a design reference. | read-only |
 | `validate_json` | Checks a composition, design or improvement patch and returns errors and warnings. Preliminary: it does not prove a correct render. | read-only |
 
 The connector does **not** render video, generate images, audio or video with AI models, or access anything outside the request it receives.
 
 ## Data and privacy
 
-- `get_capabilities` and `validate_json` store nothing.
+- `get_capabilities`, `get_template` and `validate_json` store nothing.
 - `create_hcmotion` stores the generated file in a private Vercel Blob store. Anyone with the link can download it until it expires after 24 hours; a daily job deletes expired files (at most about 48 hours after creation).
 - No accounts, cookies, tracking or AI training on your content.
 
