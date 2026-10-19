@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, retire, readIndex, readTemplate, setStore, MAX_PER_DAY, MAX_ROUNDS } from "../src/community.js";
+import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, putUpload, finishUpload, readUpload, retire, readIndex, readTemplate, setStore, MAX_PER_DAY, MAX_ROUNDS } from "../src/community.js";
 import { getTemplate } from "../src/templates.js";
 import handler from "../api/community.js";
 
@@ -20,6 +20,16 @@ async function referenceReady(id) {
   assert.equal((await putRef(id, "general.jpg", JPG)).ok, true);
   assert.equal((await putRef(id, "../x.jpg", JPG)).ok, false);
   assert.equal((await finishRef(id, { ok: true, duration: 20, width: 1920, height: 1080, sheets: { general: [1, 5, 10, 15, 19] } })).ok, true);
+}
+const MP4 = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 1, 2, 3]);
+/** What the caller's Claude does with upload.script: sends the original, then asks again. */
+async function brief(args, o) {
+  const b = await getRecreationBrief(args, o);
+  if (b.reference?.status !== "upload") return b;
+  const key = new URL(b.upload.done.replace("<count>", "1")).searchParams.get("key");
+  assert.equal((await putUpload(b.template, key, 0, MP4)).ok, true);
+  assert.equal((await finishUpload(b.template, key, 1, o)).ok, true);
+  return getRecreationBrief(args, o);
 }
 async function compared(id, round, ok = true) {
   if (ok) assert.equal((await putCompare(id, "sheet.jpg", JPG)).ok, true);
@@ -42,15 +52,15 @@ test("the source page gives title, author, video and the full prompt", async () 
 test("reference, comparison rounds, publication", async () => {
   const s = mem(); setStore(s); jobs.length = 0;
   const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
-  const first = await getRecreationBrief({ url }, opts);
+  const first = await brief({ url }, opts);
   assert.equal(first.ok, true); assert.equal(first.reference.status, "preparing"); assert.match(first.brief, /publish_template/);
   assert.deepEqual(jobs.map(j => [j.kind, j.video]), [["reference", "https://media.prompt-motion.com/x/video.b1.mp4"]]);
-  await getRecreationBrief({ url }, opts);
+  await brief({ url }, opts);
   assert.equal(jobs.length, 1, "the reference is extracted once");
   const early = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "1.1.1.1", ...opts });
   assert.equal(early.errors[0].code, "REFERENCE_NOT_READY");
   await referenceReady(id);
-  const b = await getRecreationBrief({ url }, opts);
+  const b = await brief({ url }, opts);
   assert.equal(b.reference.status, "ready"); assert.equal(b.reference.mainFormat, "horizontal"); assert.equal(b._images.length, 1);
 
   const bad = await proposeTemplate({ url, compositions: { ...compositions(), vertical: comp(1080, 1080) }, card }, { caller: "1.1.1.1", ...opts });
@@ -59,9 +69,9 @@ test("reference, comparison rounds, publication", async () => {
   assert.ok((await proposeTemplate({ url, compositions: unsigned, card }, { caller: "1.1.1.1", ...opts })).errors.some(e => e.code === "NO_SIGNATURE"));
   const r = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "1.1.1.1", ...opts });
   assert.equal(r.accepted, true); assert.equal(r.status, "comparing"); assert.equal(r.round, 1);
-  assert.deepEqual(jobs.at(-1), { kind: "compare", id, variant: "horizontal", round: 1, video: "https://media.prompt-motion.com/x/video.b1.mp4" });
+  assert.deepEqual(jobs.at(-1), { kind: "compare", id, variant: "horizontal", round: 1, video: "https://media.prompt-motion.com/x/video.b1.mp4", upload: 1 });
   assert.equal((await proposeTemplate({ url, compositions: compositions(), card }, { caller: "9.9.9.9", ...opts })).duplicate, true);
-  assert.equal((await getRecreationBrief({ url }, opts)).alreadyExists, true);
+  assert.equal((await brief({ url }, opts)).alreadyExists, true);
   assert.equal((await proposeTemplate({ url, code: r.code, compositions: compositions(), card }, opts)).errors[0].code, "COMPARING");
   assert.equal((await publishTemplate({ code: r.code, notes: "Nada" }, opts)).accepted, false, "nothing is published before its comparison");
   assert.equal((await readTemplate(id, "horizontal")).width, 1920, "the compare job reads it");
@@ -100,7 +110,7 @@ test("reference, comparison rounds, publication", async () => {
 test("comparisons are limited and an abandoned proposal frees its video", async () => {
   setStore(mem()); jobs.length = 0;
   const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe", now = Date.now();
-  await getRecreationBrief({ url }, opts); await referenceReady(id);
+  await brief({ url }, opts); await referenceReady(id);
   const r = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "1.1.1.1", ...opts, now });
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     await compared(id, round);
@@ -116,14 +126,14 @@ test("a page that refuses this server is read by the caller's Claude", async () 
   const blocked = async () => ({ ok: false, status: 403, text: async () => "" });
   const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
   const o = { ...opts, fetcher: blocked };
-  const first = await getRecreationBrief({ url }, o);
+  const first = await brief({ url }, o);
   assert.equal(first.ok, false); assert.equal(first.needsPage, true); assert.match(first.error, /403/); assert.equal(jobs.length, 0);
-  assert.match((await getRecreationBrief({ url, video: "https://evil.com/x.mp4" }, o)).error, /media\.prompt-motion\.com/);
-  const b = await getRecreationBrief({ url, video: "https://media.prompt-motion.com/x/v.mp4", prompt: "a ball and rings", title: "Rings", author: "Kent", authorUrl: "javascript:alert(1)" }, o);
+  assert.match((await brief({ url, video: "https://evil.com/x.mp4" }, o)).error, /media\.prompt-motion\.com/);
+  const b = await brief({ url, video: "https://media.prompt-motion.com/x/v.mp4", prompt: "a ball and rings", title: "Rings", author: "Kent", authorUrl: "javascript:alert(1)" }, o);
   assert.equal(b.ok, true); assert.equal(b.reference.status, "preparing"); assert.equal(b.prompt, "a ball and rings"); assert.equal(b.source.authorUrl, null);
-  assert.deepEqual(jobs.at(-1), { kind: "reference", id, video: "https://media.prompt-motion.com/x/v.mp4" });
+  assert.deepEqual(jobs.at(-1), { kind: "reference", id, video: "https://media.prompt-motion.com/x/v.mp4", upload: 1 });
   await referenceReady(id);
-  assert.equal((await getRecreationBrief({ url }, o)).reference.status, "ready", "once extracted, the video is not needed again");
+  assert.equal((await brief({ url }, o)).reference.status, "ready", "once extracted, the video is not needed again");
   const r = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "4.4.4.4", ...o });
   assert.equal(jobs.at(-1).video, "https://media.prompt-motion.com/x/v.mp4");
   await compared(id, 1);
@@ -134,9 +144,9 @@ test("a page that refuses this server is read by the caller's Claude", async () 
 test("a job that cannot read the video fails the brief", async () => {
   setStore(mem());
   const id = "c-pm-parkerrex-1a54fe";
-  await getRecreationBrief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
+  await brief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
   await finishRef(id, { ok: false, reason: "el video respondió 403" });
-  const b = await getRecreationBrief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
+  const b = await brief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
   assert.equal(b.ok, false); assert.match(b.error, /403.*compared/);
 });
 test("daily limit per caller", async () => {
@@ -145,7 +155,7 @@ test("daily limit per caller", async () => {
   const out = [];
   for (const url of ids) {
     const id = parseSource(url).id;
-    await getRecreationBrief({ url }, opts); await referenceReady(id);
+    await brief({ url }, opts); await referenceReady(id);
     out.push(await proposeTemplate({ url, compositions: compositions(), card }, { caller: "2.2.2.2", ...opts }));
   }
   assert.equal(out.filter(o => o.accepted).length, MAX_PER_DAY);
@@ -157,4 +167,31 @@ test("render callbacks need the render secret", async () => {
   const call = async (headers, query) => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(v) { this.body = v; } }; await handler({ method: "POST", headers, query, body: { id: "c-pm-x", ok: true } }, res); return res.statusCode; };
   assert.equal(await call({}, { op: "finish" }), 401);
   assert.equal(await call({ authorization: "Bearer s3cret" }, { op: "finish" }), 400);
+});
+test("prompt-motion's video is sent by the caller's Claude in parts", async () => {
+  setStore(mem()); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  const b = await getRecreationBrief({ url }, opts);
+  assert.equal(b.ok, true); assert.equal(b.reference.status, "upload"); assert.equal(jobs.length, 0);
+  assert.match(b.upload.script, /curl -sfL "https:\/\/media\.prompt-motion\.com\/x\/video\.b1\.mp4"/);
+  const key = new URL(b.upload.done).searchParams.get("key");
+  assert.equal((await getRecreationBrief({ url }, opts)).upload.done, b.upload.done, "the same upload until it ends");
+  assert.equal((await putUpload(id, "wrong".padEnd(32, "0"), 0, MP4)).ok, false);
+  assert.equal((await putUpload(id, key, 0, JPG)).ok, false, "only an .mp4");
+  assert.equal((await putUpload(id, key, 1, new Uint8Array(3_000_001))).ok, false);
+  assert.equal((await putUpload(id, key, 0, MP4)).ok, true);
+  assert.equal((await finishUpload(id, key, 2, opts)).ok, false, "a missing part");
+  assert.equal((await putUpload(id, key, 1, new Uint8Array([9, 9]))).ok, true);
+  const done = await finishUpload(id, key, 2, opts);
+  assert.equal(done.ok, true); assert.deepEqual(jobs.at(-1), { kind: "reference", id, video: "https://media.prompt-motion.com/x/video.b1.mp4", upload: 2 });
+  assert.equal((await putUpload(id, key, 0, MP4)).ok, false, "the key ends with the upload");
+  assert.deepEqual([...(await readUpload(id, 1))], [9, 9]);
+  assert.equal(await readUpload("../x", 1), null);
+  assert.equal((await getRecreationBrief({ url }, opts)).reference.status, "preparing");
+  process.env.COMMUNITY_RENDER_SECRET = "s3cret";
+  const get = async headers => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(v) { this.body = v; } }; await handler({ method: "GET", headers, query: { op: "part", id, part: "0" } }, res); return res.statusCode; };
+  assert.equal(await get({}), 401);
+  assert.equal(await get({ authorization: "Bearer s3cret" }), 200);
+  const os = await getRecreationBrief({ url: "https://oneshotted.io/v/one-shape-loop", video: "https://r2.oneshotted.io/a/b.mp4" }, { ...opts, fetcher: async () => ({ ok: false, status: 403, text: async () => "" }) });
+  assert.equal(os.reference.status, "preparing", "other sources are still downloaded by the job");
 });
