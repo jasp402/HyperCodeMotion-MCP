@@ -23,6 +23,8 @@ Like other web services, network and infrastructure providers may process techni
 
 `create_hcmotion` stores the generated `.hcmotion` file (the submitted composition, compressed) in a private Vercel Blob store so it can be downloaded. Anyone with the link can download it while it is valid. Links expire **24 hours** after creation, and a daily job deletes expired files, so a file may remain stored for up to about 48 hours before deletion. The service creates no user accounts.
 
+`propose_template` (Community templates) stores the submitted compositions, the gallery card and the source link, and publishes them in the public HyperCodeMotion Studio gallery until they are retired. It keeps a salted hash of the caller's network address for one day, only to limit proposals to 5 a day; the daily job deletes it. `get_recreation_brief` reads the public source page the user links to.
+
 The service runs on Vercel. Vercel may generate and retain infrastructure, security, deployment, and runtime logs under its own platform policies and the account configuration. We do **not** claim that Vercel stores no request metadata or that infrastructure logs have zero retention. Exact infrastructure retention can vary with plan, product, and configuration. Please consult [Vercel's Privacy Policy](https://vercel.com/legal/privacy-policy) and [Vercel's documentation](https://vercel.com/docs/observability).
 
 The MCP application does not intentionally log full submitted JSON bodies in its current request handler. Future changes to storage or logging practices will require an update to this policy.
