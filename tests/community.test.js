@@ -1,0 +1,138 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, retire, readIndex, readTemplate, setStore, MAX_PER_DAY, MAX_ROUNDS } from "../src/community.js";
+import { getTemplate } from "../src/templates.js";
+import handler from "../api/community.js";
+
+const mem = () => { const m = new Map(); return { m, put: async (p, d) => { m.set(p, typeof d === "string" ? new TextEncoder().encode(d) : new Uint8Array(d)); }, get: async p => m.get(p) ?? null }; };
+const comp = (w, h) => ({ version: 1, name: "x", width: w, height: h, fps: 30, duration: 10, background: "#000", params: {},
+  layers: [{ id: "t", type: "text", start: 0, end: 10, props: { text: "HyperCodeMotion", x: w / 2, y: h / 2 } }] });
+const compositions = () => ({ cuadrado: comp(1080, 1080), vertical: comp(1080, 1920), horizontal: comp(1920, 1080) });
+const card = { name: "Cubo de fichas", description: "Un limitador de fichas explicado en canvas", chips: ["Datos", "Canvas", "Técnico"], group: "data", moments: [["Tráfico", 0, 4], ["Ráfaga", 4, 10]] };
+const PM = `<title>Token bucket rate limiter · Prompt Motion</title><script>{"contentUrl":"https://media.prompt-motion.com/x/video.b1.mp4","creator":{"@type":"Person","name":"Parker Rex","url":"https://x.com/ParkerRex"}}</script><div id="entry-prompt" class="a">explain a token bucket &amp; more</div>`;
+const page = async () => ({ ok: true, text: async () => PM });
+const jobs = [];
+const noDispatch = async (kind, id, extra) => { jobs.push({ kind, id, ...extra }); return true; };
+const opts = { dispatch: noDispatch, fetcher: page, wait: 0 };
+const JPG = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]);
+/** What the reference job does: frames of a 1920×1080, 20 s original. */
+async function referenceReady(id) {
+  assert.equal((await putRef(id, "general.jpg", JPG)).ok, true);
+  assert.equal((await putRef(id, "../x.jpg", JPG)).ok, false);
+  assert.equal((await finishRef(id, { ok: true, duration: 20, width: 1920, height: 1080, sheets: { general: [1, 5, 10, 15, 19] } })).ok, true);
+}
+async function compared(id, round, ok = true) {
+  if (ok) assert.equal((await putCompare(id, "sheet.jpg", JPG)).ok, true);
+  return finishCompare(id, { round, ok, reason: ok ? null : "pageerror: boom", times: ok ? [[1, 0.5], [10, 5]] : null });
+}
+
+test("only video pages of the accepted sites are sources", () => {
+  assert.equal(parseSource("https://prompt-motion.com/parkerrex-1a54fe").id, "c-pm-parkerrex-1a54fe");
+  assert.equal(parseSource("https://www.oneshotted.io/v/one-shape-a-seamless-ui-morph-loop/").id, "c-os-one-shape-a-seamless-ui-morph-loop");
+  assert.ok(parseSource("https://oneshotted.io/v/" + "a".repeat(90)).id.length <= 64);
+  assert.ok(parseSource("http://prompt-motion.com/parkerrex-1a54fe").error);
+  assert.ok(parseSource("https://evil.com/parkerrex-1a54fe").error);
+  assert.ok(parseSource("https://prompt-motion.com/a/b").error);
+  assert.ok(parseSource("not a url").error);
+});
+test("the source page gives title, author, video and the full prompt", async () => {
+  const r = await readSource(parseSource("https://prompt-motion.com/parkerrex-1a54fe"), page);
+  assert.deepEqual([r.title, r.author, r.authorUrl, r.video, r.prompt, r.promptComplete], ["Token bucket rate limiter", "Parker Rex", "https://x.com/ParkerRex", "https://media.prompt-motion.com/x/video.b1.mp4", "explain a token bucket & more", true]);
+});
+test("reference, comparison rounds, publication", async () => {
+  const s = mem(); setStore(s); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  const first = await getRecreationBrief({ url }, opts);
+  assert.equal(first.ok, true); assert.equal(first.reference.status, "preparing"); assert.match(first.brief, /publish_template/);
+  assert.deepEqual(jobs.map(j => [j.kind, j.video]), [["reference", "https://media.prompt-motion.com/x/video.b1.mp4"]]);
+  await getRecreationBrief({ url }, opts);
+  assert.equal(jobs.length, 1, "the reference is extracted once");
+  const early = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "1.1.1.1", ...opts });
+  assert.equal(early.errors[0].code, "REFERENCE_NOT_READY");
+  await referenceReady(id);
+  const b = await getRecreationBrief({ url }, opts);
+  assert.equal(b.reference.status, "ready"); assert.equal(b.reference.mainFormat, "horizontal"); assert.equal(b._images.length, 1);
+
+  const bad = await proposeTemplate({ url, compositions: { ...compositions(), vertical: comp(1080, 1080) }, card }, { caller: "1.1.1.1", ...opts });
+  assert.equal(bad.accepted, false); assert.ok(bad.errors.some(e => e.code === "WRONG_SIZE"));
+  const unsigned = compositions(); unsigned.horizontal.layers[0].props.text = "Other";
+  assert.ok((await proposeTemplate({ url, compositions: unsigned, card }, { caller: "1.1.1.1", ...opts })).errors.some(e => e.code === "NO_SIGNATURE"));
+  const r = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "1.1.1.1", ...opts });
+  assert.equal(r.accepted, true); assert.equal(r.status, "comparing"); assert.equal(r.round, 1);
+  assert.deepEqual(jobs.at(-1), { kind: "compare", id, variant: "horizontal", round: 1, video: "https://media.prompt-motion.com/x/video.b1.mp4" });
+  assert.equal((await proposeTemplate({ url, compositions: compositions(), card }, { caller: "9.9.9.9", ...opts })).duplicate, true);
+  assert.equal((await getRecreationBrief({ url }, opts)).alreadyExists, true);
+  assert.equal((await proposeTemplate({ url, code: r.code, compositions: compositions(), card }, opts)).errors[0].code, "COMPARING");
+  assert.equal((await publishTemplate({ code: r.code, notes: "Nada" }, opts)).accepted, false, "nothing is published before its comparison");
+  assert.equal((await readTemplate(id, "horizontal")).width, 1920, "the compare job reads it");
+
+  // round 1 fails to render, round 2 renders: only rendered comparisons count
+  await compared(id, 1, false);
+  const failed = await getProposalStatus({ code: r.code }, { wait: 0 });
+  assert.equal(failed.status, "review"); assert.equal(failed.compare.ok, false); assert.match(failed.message, /pageerror/);
+  assert.equal((await publishTemplate({ code: r.code, notes: "Nada" }, opts)).accepted, false);
+  const r2 = await proposeTemplate({ url, code: r.code, compositions: compositions(), card }, opts);
+  assert.equal(r2.accepted, true); assert.equal(r2.round, 2); assert.equal(r2.code, r.code);
+  assert.equal((await finishCompare(id, { round: 1, ok: true, times: [[1, 1]] })).ok, false, "an older round is ignored");
+  await compared(id, 2);
+  const st = await getProposalStatus({ code: r.code }, { wait: 0 });
+  assert.equal(st.status, "review"); assert.equal(st.compare.ok, true); assert.equal(st._images.length, 1); assert.equal(st.compare.revisionsLeft, MAX_ROUNDS - 1);
+  assert.deepEqual(await readIndex(), []);
+
+  assert.equal((await publishTemplate({ code: r.code }, opts)).accepted, false, "notes are required");
+  const p = await publishTemplate({ code: r.code, notes: "Fondo sin grano: el motor no lo hace." }, opts);
+  assert.equal(p.accepted, true); assert.equal(p.status, "rendering"); assert.equal(jobs.at(-1).kind, "render");
+  assert.equal((await putMedia(id, "1-1.mp4", new Uint8Array([1, 2]))).ok, true);
+  assert.equal((await putMedia(id, "../x", new Uint8Array([1]))).ok, false);
+  await finishRender(id, { ok: true });
+  const idx = await readIndex();
+  assert.equal(idx.length, 1);
+  assert.equal(idx[0].info.autor, "Parker Rex"); assert.equal(idx[0].info.fuente, "parkerrex-1a54fe");
+  assert.match(idx[0].media, /\/c\/c-pm-parkerrex-1a54fe\/c-pm-parkerrex-1a54fe$/);
+  const t = await getTemplate({ template: id, format: "9:16" });
+  assert.equal(t.found, true); assert.equal(t.composition.community, undefined); assert.equal(t.name, "Cubo de fichas");
+  assert.equal((await proposeTemplate({ url, code: r.code, compositions: compositions(), card }, opts)).errors[0].code, "NOT_REVISABLE");
+  await retire(id);
+  assert.deepEqual(await readIndex(), []);
+  assert.equal((await getProposalStatus({ code: r.code }, { wait: 0 })).status, "retired");
+  assert.equal(await readTemplate(id, "vertical"), null);
+});
+test("comparisons are limited and an abandoned proposal frees its video", async () => {
+  setStore(mem()); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe", now = Date.now();
+  await getRecreationBrief({ url }, opts); await referenceReady(id);
+  const r = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "1.1.1.1", ...opts, now });
+  for (let round = 1; round <= MAX_ROUNDS; round++) {
+    await compared(id, round);
+    if (round < MAX_ROUNDS) assert.equal((await proposeTemplate({ url, code: r.code, compositions: compositions(), card }, opts)).accepted, true);
+  }
+  assert.equal((await proposeTemplate({ url, code: r.code, compositions: compositions(), card }, opts)).errors[0].code, "ROUNDS_USED");
+  const later = now + 25 * 3600e3;
+  const other = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "3.3.3.3", ...opts, now: later });
+  assert.equal(other.accepted, true); assert.notEqual(other.code, r.code);
+});
+test("a page without a readable video is not recreated", async () => {
+  setStore(mem());
+  const noVideo = async () => ({ ok: true, text: async () => PM.replace(/"contentUrl":"[^"]+",/, "") });
+  const b = await getRecreationBrief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, { ...opts, fetcher: noVideo });
+  assert.equal(b.ok, false); assert.match(b.error, /compared/);
+});
+test("daily limit per caller", async () => {
+  setStore(mem());
+  const ids = Array.from({ length: MAX_PER_DAY + 1 }, (_, i) => `https://prompt-motion.com/autor-${i}abc`);
+  const out = [];
+  for (const url of ids) {
+    const id = parseSource(url).id;
+    await getRecreationBrief({ url }, opts); await referenceReady(id);
+    out.push(await proposeTemplate({ url, compositions: compositions(), card }, { caller: "2.2.2.2", ...opts }));
+  }
+  assert.equal(out.filter(o => o.accepted).length, MAX_PER_DAY);
+  assert.equal(out.at(-1).errors[0].code, "DAILY_LIMIT");
+});
+test("render callbacks need the render secret", async () => {
+  setStore(mem());
+  process.env.COMMUNITY_RENDER_SECRET = "s3cret";
+  const call = async (headers, query) => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(v) { this.body = v; } }; await handler({ method: "POST", headers, query, body: { id: "c-pm-x", ok: true } }, res); return res.statusCode; };
+  assert.equal(await call({}, { op: "finish" }), 401);
+  assert.equal(await call({ authorization: "Bearer s3cret" }, { op: "finish" }), 400);
+});

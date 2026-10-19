@@ -17,6 +17,10 @@ Use this Skill when asked to create, improve, extend, combine, or troubleshoot e
 6. **MCP validation** — The HyperCodeMotion MCP (`https://mcp.hypercodemotion.com/mcp`) is required. Call `get_capabilities` before selecting layer/effect fields; `validate_json` is optional for drafts. **Do not claim validation if no call occurred.**
 7. **Studio handoff** — Call `create_hcmotion` with the finished JSON. If `created` is false, fix every error and call it again. Give the user the two links it returns: `open` (opens the project in Studio) and `download` (the `.hcmotion` file, to keep or load later with «Cargar proyecto»), and say both expire in 24 hours. **Never paste the composition JSON for the user to copy:** Studio only opens `.hcmotion` files. If the MCP is not connected, stop and ask the user to connect it instead of returning JSON. Never claim a perfect render from MCP results alone.
 
+## Turning a public video into a gallery template
+
+When the user shares the link of a video from prompt-motion.com or oneshotted.io and wants it in the Studio gallery, call `get_recreation_brief` with that link (again if its reference frames are still being prepared) and follow its brief, working from the reference frames of the original: recreate it in the three formats in this conversation, check each with `validate_json`, then call `propose_template`. Look at the comparison `get_proposal_status` returns (original and recreation side by side), fix what differs and send it again with the same code; call `publish_template` only when it truly looks like the original. The user only gives the link; do not show them compositions. Give them the tracking code. If the brief says the video already exists, give that status instead of recreating it.
+
 ## Always load relevant references
 
 - [Composition and JSON contract](references/composition.md): root format, layers, timing, scenes, editing and merging.

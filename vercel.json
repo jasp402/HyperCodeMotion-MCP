@@ -12,8 +12,21 @@
     {
       "source": "/d/:id",
       "destination": "/api/d?id=:id"
+    },
+    {
+      "source": "/community",
+      "destination": "/api/community"
+    },
+    {
+      "source": "/c/:id/:file",
+      "destination": "/api/community?id=:id&file=:file"
     }
   ],
+  "functions": {
+    "api/mcp.js": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cleanup",
