@@ -113,6 +113,7 @@ export async function readSource(src, fetcher = fetch) {
     } catch { /* page layout changed: Claude reads the page itself */ }
   }
   if (out.title) out.title = text(out.title);
+  if (!out.video) out.error = `The page gave no video (${html.length} bytes${/cf-chl|challenge-platform|Just a moment/.test(html) ? ", a bot check" : ""}).`;
   return out;
 }
 
@@ -157,7 +158,7 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
   if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a Community template (or one is being made from it). Do not recreate it: give the user this status." };
   const page = await readSource(src, fetcher);
   const ref = await reference(src, page.video, { now, dispatch, wait });
-  if (ref.status === "failed") return { ok: false, template: src.id, error: `${ref.reason || "The video could not be read."} A template is only made when it can be compared with its original video, so this one cannot be recreated now.` };
+  if (ref.status === "failed") return { ok: false, template: src.id, error: `${ref.reason || "The video could not be read."}${page.error ? ` (${page.error})` : ""} A template is only made when it can be compared with its original video, so this one cannot be recreated now.` };
   const out = {
     ok: true, alreadyExists: false, template: src.id,
     source: { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title, author: page.author, authorUrl: page.authorUrl, video: page.video },
