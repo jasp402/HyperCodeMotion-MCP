@@ -111,17 +111,25 @@ test("comparisons are limited and an abandoned proposal frees its video", async 
   const other = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "3.3.3.3", ...opts, now: later });
   assert.equal(other.accepted, true); assert.notEqual(other.code, r.code);
 });
-test("a page that hides its video from the server is read by the reference job", async () => {
+test("a page that refuses this server is read by the caller's Claude", async () => {
   setStore(mem()); jobs.length = 0;
-  const noVideo = async () => ({ ok: true, text: async () => "<html>Just a moment...</html>" });
+  const blocked = async () => ({ ok: false, status: 403, text: async () => "" });
   const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
-  const b = await getRecreationBrief({ url }, { ...opts, fetcher: noVideo });
-  assert.equal(b.reference.status, "preparing");
-  assert.deepEqual(jobs.at(-1), { kind: "reference", id, page: url });
-  assert.equal((await finishRef(id, { ok: true, duration: 20, width: 1920, height: 1080, sheets: { general: [1] }, video: "https://evil.com/x.mp4" })).ok, false);
-  assert.equal((await finishRef(id, { ok: true, duration: 20, width: 1920, height: 1080, sheets: { general: [1] }, video: "https://media.prompt-motion.com/x/v.mp4" })).ok, true);
-  await proposeTemplate({ url, compositions: compositions(), card }, { caller: "4.4.4.4", ...opts, fetcher: noVideo });
+  const o = { ...opts, fetcher: blocked };
+  const first = await getRecreationBrief({ url }, o);
+  assert.equal(first.ok, false); assert.equal(first.needsPage, true); assert.match(first.error, /403/); assert.equal(jobs.length, 0);
+  assert.match((await getRecreationBrief({ url, video: "https://evil.com/x.mp4" }, o)).error, /media\.prompt-motion\.com/);
+  const b = await getRecreationBrief({ url, video: "https://media.prompt-motion.com/x/v.mp4", prompt: "a ball and rings", title: "Rings", author: "Kent", authorUrl: "javascript:alert(1)" }, o);
+  assert.equal(b.ok, true); assert.equal(b.reference.status, "preparing"); assert.equal(b.prompt, "a ball and rings"); assert.equal(b.source.authorUrl, null);
+  assert.deepEqual(jobs.at(-1), { kind: "reference", id, video: "https://media.prompt-motion.com/x/v.mp4" });
+  await referenceReady(id);
+  assert.equal((await getRecreationBrief({ url }, o)).reference.status, "ready", "once extracted, the video is not needed again");
+  const r = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "4.4.4.4", ...o });
   assert.equal(jobs.at(-1).video, "https://media.prompt-motion.com/x/v.mp4");
+  await compared(id, 1);
+  await publishTemplate({ code: r.code, notes: "Nada" }, o);
+  await finishRender(id, { ok: true });
+  assert.equal((await readIndex())[0].info.autor, "Kent");
 });
 test("a job that cannot read the video fails the brief", async () => {
   setStore(mem());
