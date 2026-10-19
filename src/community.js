@@ -137,13 +137,14 @@ const refPath = (id, f = "meta.json") => `community/refs/${id}/${f}`;
 /** The source video's reference frames: extracted once per video by the render workflow. */
 async function reference(src, info, { now, dispatch, wait }) {
   let meta = await getJson(refPath(src.id));
-  const stuck = m => m && m.status !== "ready" && now - Date.parse(m.requested) > RETRY_MS;
+  // a job that could not be started is tried again at once; one that started gets RETRY_MS to answer
+  const stuck = m => m && m.status !== "ready" && (m.notSent || now - Date.parse(m.requested) > RETRY_MS);
   if (!meta || stuck(meta)) {
     if (!info.video) return { status: "missing" };
     meta = { status: "preparing", video: info.video, requested: iso(now), info: { title: info.title, author: info.author, authorUrl: info.authorUrl } };
     await putJson(refPath(src.id), meta);
     if (!(await dispatch("reference", src.id, { video: info.video }).catch(() => false))) {
-      meta = { ...meta, status: "failed", reason: "The video could not be sent to be read right now; try again later." };
+      meta = { ...meta, status: "failed", notSent: true, reason: "The video could not be sent to be read right now; try again later." };
       await putJson(refPath(src.id), meta);
     }
   }
@@ -347,7 +348,8 @@ export async function dispatchJob(kind, id, extra = {}, fetcher = fetch) {
     method: "POST", headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "content-type": "application/json", "user-agent": "hypercodemotion-mcp" },
     body: JSON.stringify({ event_type: "community-render", client_payload: { kind, id, mcp: PUBLIC_URL, ...extra } })
   });
-  return r.status === 204;
+  // GitHub answers 204, or 200 with the run's details
+  return r.ok;
 }
 
 const num = (v, min, max) => Number.isFinite(v) && v >= min && v <= max;
