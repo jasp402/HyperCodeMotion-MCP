@@ -13,6 +13,7 @@
  * Blob layout (private store, served by api/community.js):
  *   community/refs/<id>/meta.json        reference of the source video (status, duration, size, frame times)
  *   community/refs/<id>/<sheet>.jpg      reference frame sheets (general, inicio)
+ *   community/refs/<id>/video/<n>        the original in parts, when the caller's Claude had to send it
  *   community/compare/<id>/<file>        latest comparison (sheet.jpg, comparacion.mp4)
  *   community/records/<id>.json          state of a template (status, code, source, card, comparison)
  *   community/codes/<code>.json          tracking code → template id
@@ -21,14 +22,16 @@
  *   community/index.json                 published templates, read by the gallery
  *   community/limits/<day>.json          proposals per caller per day
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { validateJson } from "./contract.js";
 import { checkComposition } from "./hcmotion.js";
 import { BRIEF, FORMATS, GROUPS } from "./brief.js";
 import { PUBLIC_URL } from "./files.js";
 
 export const SOURCES = {
-  "prompt-motion.com": { name: "Prompt Motion", path: /^\/([a-z0-9][a-z0-9_-]{2,80})\/?$/, prefix: "pm", videoHost: "media.prompt-motion.com", video: /^https:\/\/media\.prompt-motion\.com\/[^\s"']+\.mp4$/ },
+  "prompt-motion.com": { name: "Prompt Motion", path: /^\/([a-z0-9][a-z0-9_-]{2,80})\/?$/, prefix: "pm", videoHost: "media.prompt-motion.com", video: /^https:\/\/media\.prompt-motion\.com\/[^\s"']+\.mp4$/,
+    // its videos answer 403 to every server (Vercel, GitHub), so the caller's Claude downloads it and sends it here
+    callerSends: true },
   "oneshotted.io": { name: "Oneshotted", path: /^\/v\/([a-z0-9][a-z0-9-]{2,120})\/?$/, prefix: "os", videoHost: "r2.oneshotted.io", video: /^https:\/\/r2\.oneshotted\.io\/[^\s"']+\.mp4$/ }
 };
 export const MAX_PER_DAY = 5;
@@ -39,6 +42,9 @@ const MAX_SUBMISSIONS = MAX_ROUNDS * 2;
 const STALE_MS = 24 * 3600e3;      // a proposal left unpublished this long frees its video for someone else
 const RETRY_MS = 15 * 60e3;        // a reference job that did not answer in this time is started again
 const WAIT_MS = 40e3;              // tools wait this long for a running job before answering
+const UPLOAD_MS = 60 * 60e3;       // an upload not finished in this time is started again with a new key
+export const PART_BYTES = 3_000_000; // the original is sent in parts that fit a function's request body
+export const MAX_PARTS = 20;
 export const REF_FILES = ["general.jpg", "inicio.jpg"];
 export const COMPARE_FILES = ["sheet.jpg", "comparacion.mp4"];
 const MAX_DURATION = 45;
@@ -138,10 +144,15 @@ const refPath = (id, f = "meta.json") => `community/refs/${id}/${f}`;
 async function reference(src, info, { now, dispatch, wait }) {
   let meta = await getJson(refPath(src.id));
   // a job that could not be started is tried again at once; one that started gets RETRY_MS to answer
-  const stuck = m => m && m.status !== "ready" && (m.notSent || now - Date.parse(m.requested) > RETRY_MS);
+  const stuck = m => m && m.status !== "ready" && (m.status === "upload" ? now - Date.parse(m.requested) > UPLOAD_MS : m.notSent || now - Date.parse(m.requested) > RETRY_MS);
   if (!meta || stuck(meta)) {
     if (!info.video) return { status: "missing" };
     meta = { status: "preparing", video: info.video, requested: iso(now), info: { title: info.title, author: info.author, authorUrl: info.authorUrl } };
+    if (SOURCES[src.host].callerSends) {
+      meta = { ...meta, status: "upload", key: randomBytes(16).toString("hex") };
+      await putJson(refPath(src.id), meta);
+      return meta;
+    }
     await putJson(refPath(src.id), meta);
     if (!(await dispatch("reference", src.id, { video: info.video }).catch(() => false))) {
       meta = { ...meta, status: "failed", notSent: true, reason: "The video could not be sent to be read right now; try again later." };
@@ -182,6 +193,15 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
     note: info.prompt ? (info.promptComplete ? "prompt is the full prompt published with the video." : "prompt may be only part of the original prompt: the reference frames are what to follow.") : "The page's prompt is not known here: read it on the page; the reference frames are what to follow.",
     formats: FORMATS, groups: GROUPS, maxDuration: MAX_DURATION, brief: BRIEF
   };
+  if (ref.status === "upload") {
+    const send = `${PUBLIC_URL}/api/community?id=${src.id}&key=${ref.key}`;
+    return {
+      ...out, reference: { status: "upload" },
+      upload: { video: ref.video, partBytes: PART_BYTES, maxParts: MAX_PARTS, part: `${send}&op=upload&part=<n>`, done: `${send}&op=upload-done&parts=<count>`,
+        script: `set -e; curl -sfL "${ref.video}" -o original.mp4; split -b ${PART_BYTES} -d -a 2 original.mp4 part.; n=0; for f in part.*; do curl -sf -H "content-type: application/octet-stream" --data-binary @"$f" "${send}&op=upload&part=$n" >/dev/null; n=$((n+1)); done; curl -sf -X POST "${send}&op=upload-done&parts=$n"` },
+      message: `${src.site} does not let servers download its videos, so you send it: run upload.script in your code or shell tool (it downloads the video and sends it here in parts; it needs network access to ${SOURCES[src.host].videoHost} and ${new URL(PUBLIC_URL).host}). Then call get_recreation_brief again with the same url. If you have no tool that can run it, tell the user this video cannot be recreated from here.`
+    };
+  }
   if (ref.status !== "ready") return { ...out, reference: { status: "preparing" }, message: "The original video is being downloaded and its reference frames extracted (usually one or two minutes). Read the prompt meanwhile, then call get_recreation_brief again with the same url. Do not build anything before you have seen the frames." };
   const sheets = [];
   for (const f of REF_FILES) { const b = ref.sheets?.[f.slice(0, -4)] && await jpg(refPath(src.id, f)); if (b) sheets.push({ name: f.slice(0, -4), times: ref.sheets[f.slice(0, -4)], data: b }); }
@@ -292,7 +312,7 @@ export async function proposeTemplate(args, { caller, now = Date.now(), dispatch
     await putJson(`community/templates/${src.id}/${f.variant}.json`, c);
   }
   if (!revision) await putJson(`community/codes/${record.code}.json`, { id: src.id });
-  const sent = await dispatch("compare", src.id, { variant, round: record.compare.round, video: ref.video }).catch(() => false);
+  const sent = await dispatch("compare", src.id, { variant, round: record.compare.round, video: ref.video, ...(ref.uploaded ? { upload: ref.uploaded } : {}) }).catch(() => false);
   if (!sent) Object.assign(record, { status: "review", compare: { ...record.compare, ok: false, reason: "The comparison could not be started right now: send it again later with the same code." } });
   await putJson(`community/records/${src.id}.json`, record);
   return {
@@ -354,6 +374,39 @@ export async function dispatchJob(kind, id, extra = {}, fetcher = fetch) {
 
 const num = (v, min, max) => Number.isFinite(v) && v >= min && v <= max;
 const times = (a, max) => Array.isArray(a) && a.length <= 40 && a.every(t => num(t, 0, max));
+
+const sameKey = (a, b) => typeof a === "string" && typeof b === "string" && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+/** The caller's Claude sends the original, one part at a time. */
+export async function putUpload(id, key, part, bytes) {
+  const m = await getJson(refPath(id));
+  if (m?.status !== "upload" || !sameKey(m.key, key)) return { ok: false, error: "No upload is waiting with that key: call get_recreation_brief again." };
+  const n = Number(part);
+  if (!Number.isInteger(n) || n < 0 || n >= MAX_PARTS) return { ok: false, error: `part must be 0 to ${MAX_PARTS - 1}.` };
+  if (!bytes?.length || bytes.length > PART_BYTES) return { ok: false, error: `Each part must have 1 to ${PART_BYTES} bytes.` };
+  if (n === 0 && Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") return { ok: false, error: "That is not an .mp4 file." };
+  await (await store()).put(refPath(id, `video/${n}`), bytes, "application/octet-stream");
+  return { ok: true };
+}
+/** All parts sent: the reference job reads them back from here. */
+export async function finishUpload(id, key, parts, { now = Date.now(), dispatch = dispatchJob } = {}) {
+  const m = await getJson(refPath(id));
+  if (m?.status !== "upload" || !sameKey(m.key, key)) return { ok: false, error: "No upload is waiting with that key: call get_recreation_brief again." };
+  const count = Number(parts);
+  if (!Number.isInteger(count) || count < 1 || count > MAX_PARTS) return { ok: false, error: `parts must be 1 to ${MAX_PARTS}.` };
+  for (let i = 0; i < count; i++) if (!(await (await store()).get(refPath(id, `video/${i}`)))) return { ok: false, error: `Part ${i} is missing: send it again, then call this again.` };
+  let next = { ...m, status: "preparing", key: null, uploaded: count, requested: iso(now) };
+  await putJson(refPath(id), next);
+  if (!(await dispatch("reference", id, { video: m.video, upload: count }).catch(() => false))) {
+    next = { ...next, status: "failed", notSent: true, reason: "The video could not be sent to be read right now; try again later." };
+    await putJson(refPath(id), next);
+  }
+  return { ok: next.status === "preparing", status: next.status, message: "Received. Call get_recreation_brief again with the same url to see the reference frames." };
+}
+/** Reference and compare jobs: a part of an original the caller sent. */
+export async function readUpload(id, part) {
+  if (!/^c-[a-z0-9-]{3,62}$/.test(id) || !/^\d{1,2}$/.test(String(part))) return null;
+  return (await store()).get(refPath(id, `video/${Number(part)}`));
+}
 
 /** Reference job: one frame sheet at a time. */
 export async function putRef(id, file, bytes) {

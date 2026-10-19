@@ -1,4 +1,4 @@
-import { finishCompare, finishRef, finishRender, putCompare, putMedia, putRef, readCompare, readIndex, readMedia, readTemplateWithStatus, retire } from "../src/community.js";
+import { finishCompare, finishRef, finishRender, finishUpload, putCompare, putMedia, putRef, putUpload, readCompare, readIndex, readMedia, readTemplateWithStatus, readUpload, retire } from "../src/community.js";
 
 const MAX = 4 * 1024 * 1024;
 const json = (res, status, payload, cache = "no-store") => { res.statusCode = status; res.setHeader("Content-Type", "application/json"); res.setHeader("Cache-Control", cache); res.end(JSON.stringify(payload)); };
@@ -17,6 +17,9 @@ async function body(req) {
  *   GET  /c/<id>/<variant>.json      a template's composition (cuadrado, vertical, horizontal)
  *   GET  /c/<id>/<id>-<ratio>.<ext>  its preview media
  *   GET  /api/community?op=compare&id=&file=  latest comparison, sheet.jpg or comparacion.mp4 (COMMUNITY_ADMIN_SECRET)
+ *   GET  /api/community?op=part&id=&part=      a part of an original the caller sent (COMMUNITY_RENDER_SECRET)
+ *   POST /api/community?op=upload&id=&key=&part=   the caller's Claude sends one part of the original (key from the brief)
+ *   POST /api/community?op=upload-done&id=&key=&parts=   all parts sent: starts the reference job
  *   POST /api/community?op=ref&id=&file=     reference job uploads one frame sheet (COMMUNITY_RENDER_SECRET)
  *   POST /api/community?op=ref-done          {id, ok, reason, duration, width, height, sheets} (COMMUNITY_RENDER_SECRET)
  *   POST /api/community?op=compare&id=&file= compare job uploads sheet.jpg or comparacion.mp4 (COMMUNITY_RENDER_SECRET)
@@ -32,6 +35,15 @@ export default async function handler(req, res) {
   const op = q("op"), id = q("id"), file = q("file");
   if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
   if (req.method === "GET" || req.method === "HEAD") {
+    if (op === "part") {
+      if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
+      const bytes = await readUpload(String(id), q("part"));
+      if (!bytes) { res.statusCode = 404; return res.end("Not found."); }
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Cache-Control", "no-store");
+      return res.end(Buffer.from(bytes));
+    }
     if (op === "compare") {
       if (!bearer(req, process.env.COMMUNITY_ADMIN_SECRET)) return json(res, 401, { error: "Unauthorized" });
       const bytes = await readCompare(String(id), String(file));
@@ -58,6 +70,15 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { error: "Use GET or POST." });
   let data;
   try { data = await body(req); } catch { return json(res, 413, { error: "Larger than 4 MB." }); }
+  if (op === "upload") {
+    const bytes = Buffer.isBuffer(data) ? data : null;
+    const r = await putUpload(String(id), q("key"), q("part"), bytes);
+    return json(res, r.ok ? 200 : 400, r);
+  }
+  if (op === "upload-done") {
+    const r = await finishUpload(String(id), q("key"), q("parts"));
+    return json(res, r.ok ? 200 : 400, r);
+  }
   const uploads = { media: putMedia, ref: putRef, compare: putCompare };
   if (uploads[op]) {
     if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
