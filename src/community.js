@@ -28,8 +28,8 @@ import { BRIEF, FORMATS, GROUPS } from "./brief.js";
 import { PUBLIC_URL } from "./files.js";
 
 export const SOURCES = {
-  "prompt-motion.com": { name: "Prompt Motion", path: /^\/([a-z0-9][a-z0-9_-]{2,80})\/?$/, prefix: "pm", video: /^https:\/\/media\.prompt-motion\.com\/[^\s"']+\.mp4$/ },
-  "oneshotted.io": { name: "Oneshotted", path: /^\/v\/([a-z0-9][a-z0-9-]{2,120})\/?$/, prefix: "os", video: /^https:\/\/r2\.oneshotted\.io\/[^\s"']+\.mp4$/ }
+  "prompt-motion.com": { name: "Prompt Motion", path: /^\/([a-z0-9][a-z0-9_-]{2,80})\/?$/, prefix: "pm", videoHost: "media.prompt-motion.com", video: /^https:\/\/media\.prompt-motion\.com\/[^\s"']+\.mp4$/ },
+  "oneshotted.io": { name: "Oneshotted", path: /^\/v\/([a-z0-9][a-z0-9-]{2,120})\/?$/, prefix: "os", videoHost: "r2.oneshotted.io", video: /^https:\/\/r2\.oneshotted\.io\/[^\s"']+\.mp4$/ }
 };
 export const MAX_PER_DAY = 5;
 export const MAX_GLOBAL_PER_DAY = 100;
@@ -135,20 +135,29 @@ const holds = (r, now) => r && r.status !== "failed" && (!["comparing", "review"
 
 const refPath = (id, f = "meta.json") => `community/refs/${id}/${f}`;
 /** The source video's reference frames: extracted once per video by the render workflow. */
-async function reference(src, video, { now, dispatch, wait }) {
+async function reference(src, info, { now, dispatch, wait }) {
   let meta = await getJson(refPath(src.id));
   const stuck = m => m && m.status !== "ready" && now - Date.parse(m.requested) > RETRY_MS;
   if (!meta || stuck(meta)) {
-    // a page that does not show its video to this server (a bot check, say) is read by the job itself
-    if (video && !SOURCES[src.host].video.test(video)) video = null;
-    meta = { status: "preparing", video, requested: iso(now) };
+    if (!info.video) return { status: "missing" };
+    meta = { status: "preparing", video: info.video, requested: iso(now), info: { title: info.title, author: info.author, authorUrl: info.authorUrl } };
     await putJson(refPath(src.id), meta);
-    if (!(await dispatch("reference", src.id, video ? { video } : { page: src.url }).catch(() => false))) {
+    if (!(await dispatch("reference", src.id, { video: info.video }).catch(() => false))) {
       meta = { ...meta, status: "failed", reason: "The video could not be sent to be read right now; try again later." };
       await putJson(refPath(src.id), meta);
     }
   }
   return waitFor(refPath(src.id), meta, m => m.status !== "preparing", wait);
+}
+
+const clip = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+/** What the caller's Claude read on the source page itself. */
+function fromCaller(args, src) {
+  const video = clip(args.video, 500), authorUrl = clip(args.authorUrl, 300);
+  return {
+    video: video && SOURCES[src.host].video.test(video) ? video : null, badVideo: !!video && !SOURCES[src.host].video.test(video),
+    prompt: clip(args.prompt, 20000), title: clip(args.title, 200), author: clip(args.author, 80), authorUrl: authorUrl && /^https:\/\/[^\s"'<>]+$/.test(authorUrl) ? authorUrl : null
+  };
 }
 
 /** get_recreation_brief */
@@ -157,14 +166,19 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
   if (src.error) return { ok: false, error: src.error };
   const existing = await getJson(`community/records/${src.id}.json`);
   if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a Community template (or one is being made from it). Do not recreate it: give the user this status." };
+  const given = fromCaller(args, src);
+  if (given.badVideo) return { ok: false, template: src.id, error: `video must be the address of the page's own video file (an .mp4 on ${SOURCES[src.host].videoHost}).` };
+  // the source sites often refuse this server (bot checks): what the caller read on the page fills the gaps
   const page = await readSource(src, fetcher);
-  const ref = await reference(src, page.video, { now, dispatch, wait });
-  if (ref.status === "failed") return { ok: false, template: src.id, error: `${ref.reason || "The video could not be read."}${page.error ? ` (${page.error})` : ""} A template is only made when it can be compared with its original video, so this one cannot be recreated now.` };
+  const info = { video: page.video || given.video, prompt: page.prompt || given.prompt, promptComplete: page.prompt ? page.promptComplete : null, title: page.title || given.title, author: page.author || given.author, authorUrl: page.authorUrl || given.authorUrl };
+  const ref = await reference(src, info, { now, dispatch, wait });
+  if (ref.status === "missing") return { ok: false, template: src.id, needsPage: true, error: `This server could not read the page${page.error ? ` (${page.error})` : ""}. Open the page yourself, then call get_recreation_brief again with the url and what the page shows: video (the address of its .mp4 file, on ${SOURCES[src.host].videoHost}), prompt, title and author.` };
+  if (ref.status === "failed") return { ok: false, template: src.id, error: `${ref.reason || "The video could not be read."} A template is only made when it can be compared with its original video, so this one cannot be recreated now.` };
   const out = {
     ok: true, alreadyExists: false, template: src.id,
-    source: { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title, author: page.author, authorUrl: page.authorUrl, video: page.video },
-    prompt: page.prompt, promptComplete: page.promptComplete,
-    note: page.prompt ? (page.promptComplete ? "prompt is the full prompt published with the video." : "prompt is only the start of the original prompt: the reference frames are what to follow.") : "The page's prompt could not be read here: the reference frames are what to follow.",
+    source: { site: src.site, page: src.page, id: src.slug, url: src.url, title: info.title, author: info.author, authorUrl: info.authorUrl, video: info.video || ref.video },
+    prompt: info.prompt, promptComplete: info.promptComplete,
+    note: info.prompt ? (info.promptComplete ? "prompt is the full prompt published with the video." : "prompt may be only part of the original prompt: the reference frames are what to follow.") : "The page's prompt is not known here: read it on the page; the reference frames are what to follow.",
     formats: FORMATS, groups: GROUPS, maxDuration: MAX_DURATION, brief: BRIEF
   };
   if (ref.status !== "ready") return { ...out, reference: { status: "preparing" }, message: "The original video is being downloaded and its reference frames extracted (usually one or two minutes). Read the prompt meanwhile, then call get_recreation_brief again with the same url. Do not build anything before you have seen the frames." };
@@ -268,7 +282,7 @@ export async function proposeTemplate(args, { caller, now = Date.now(), dispatch
   const record = {
     id: src.id, code: revision ? existing.code : `${now.toString(36)}${randomBytes(4).toString("hex")}`, status: "comparing",
     created: revision ? existing.created : iso(now), updated: iso(now),
-    source: revision ? existing.source : { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title ?? null, author: page.author ?? null, authorUrl: page.authorUrl ?? null },
+    source: revision ? existing.source : { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title ?? ref.info?.title ?? null, author: page.author ?? ref.info?.author ?? null, authorUrl: page.authorUrl ?? ref.info?.authorUrl ?? null },
     card, variant, reason: null,
     compare: { round: revision ? existing.compare.round + 1 : 1, done: revision ? existing.compare.done : 0, ok: null, reason: null, times: null }
   };
@@ -348,14 +362,9 @@ export async function putRef(id, file, bytes) {
   return { ok: true };
 }
 /** Reference job finished: the video's size, duration and the times of each sheet's frames. */
-export async function finishRef(id, { ok, reason, duration, width, height, sheets, video }) {
+export async function finishRef(id, { ok, reason, duration, width, height, sheets }) {
   const m = await getJson(refPath(id));
   if (m?.status !== "preparing") return { ok: false, error: "No reference is being prepared." };
-  if (ok && !m.video) {
-    const host = Object.values(SOURCES).find(s => s.video.test(String(video)));
-    if (!host) return { ok: false, error: "video must be the source page's video." };
-    m.video = video;
-  }
   if (ok && !(num(duration, 0.5, 600) && num(width, 16, 8192) && num(height, 16, 8192) && sheets && times(sheets.general, duration) && (sheets.inicio == null || times(sheets.inicio, duration)))) return { ok: false, error: "duration, width, height and sheets.general are required." };
   const next = ok ? { ...m, status: "ready", duration, width, height, sheets: { general: sheets.general, ...(sheets.inicio ? { inicio: sheets.inicio } : {}) }, reason: null }
     : { ...m, status: "failed", reason: String(reason || "The video could not be read.").slice(0, 300) };
