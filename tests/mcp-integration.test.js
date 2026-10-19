@@ -53,7 +53,7 @@ test("MCP ping is available", async () => {
 });
 test("tools/list includes catalog, file creator and validator", async () => {
   const r = await request("POST", rpc("tools/list"));
-  assert.deepEqual(r.body.result.tools.map(x=>x.name),["get_capabilities","create_hcmotion","get_template","validate_json","get_recreation_brief","propose_template","get_proposal_status"]);
+  assert.deepEqual(r.body.result.tools.map(x=>x.name),["get_capabilities","create_hcmotion","get_template","validate_json","get_recreation_brief","propose_template","get_proposal_status","publish_template"]);
 });
 test("get_capabilities returns recognized layer types and fx", async () => {
   const r = await request("POST", tool("get_capabilities",{}));

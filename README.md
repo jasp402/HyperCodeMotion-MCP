@@ -32,22 +32,24 @@ Both links expire **24 hours** after they are created. Save the project from Stu
 | `create_hcmotion` | Validates a finished composition and packages it as a `.hcmotion` file. Invalid input returns `created: false` with the errors to fix and stores nothing. Valid input returns `open` and `download` links (24 h). | write (creates a temporary file), not destructive |
 | `get_template` | Returns the full design of a Studio gallery template by its id and format (brief, scenes, HTML scene documents and layers), to use as a design reference. | read-only |
 | `validate_json` | Checks a composition, design or improvement patch and returns errors and warnings. Preliminary: it does not prove a correct render. | read-only |
-| `get_recreation_brief` | Takes the link of a public motion video (prompt-motion.com or oneshotted.io) and returns its source details, its published prompt when available and the brief to recreate it as a gallery template. | read-only, reads the source page |
-| `propose_template` | Submits the recreation (three compositions and the gallery card). Checks the source, the compositions and the card; when accepted, stores it, renders its previews and publishes it in the Studio gallery marked «Community». Returns a tracking code. | write, not destructive |
-| `get_proposal_status` | Returns the status of a proposal by its tracking code: rendering, published, failed (with the reason) or retired. | read-only |
+| `get_recreation_brief` | Takes the link of a public motion video (prompt-motion.com or oneshotted.io) and returns its source details, its published prompt when available, the brief to recreate it as a gallery template and reference frames of the original video (extracted once per video; the first call may answer that they are being prepared). | write (starts the frame extraction), not destructive |
+| `propose_template` | Submits the recreation (three compositions and the gallery card). Checks the source, the compositions and the card; when accepted, renders the composition in the original's format with the Studio engine and compares it with the original frame by frame. Send fixes with the same code (up to 3 comparisons). Returns a tracking code. | write, not destructive |
+| `get_proposal_status` | Returns the status of a proposal by its tracking code: comparing, review (with the comparison sheet: original and recreation side by side), rendering, published, failed (with the reason) or retired. | read-only |
+| `publish_template` | Publishes a compared proposal in the Studio gallery marked «Community», with notes on what is consciously different from the original. | write, not destructive |
 
-The recreation itself happens in the user's own Claude conversation; the connector only gives the brief and receives the result. It does **not** render video for users, generate images, audio or video with AI models, or access anything outside the request it receives.
+The recreation itself happens in the user's own Claude conversation; the connector gives the brief and the reference frames, and returns the comparison with the original. It does **not** render video for users, generate images, audio or video with AI models, or access anything outside the request it receives.
 
 ## Data and privacy
 
-- `get_capabilities`, `get_template`, `validate_json`, `get_recreation_brief` and `get_proposal_status` store nothing.
+- `get_capabilities`, `get_template`, `validate_json` and `get_proposal_status` store nothing.
+- `get_recreation_brief` stores reference frames of the public source video in the private store (never published), so the recreation can be compared with it.
 - `propose_template` stores the accepted template, its card and its source link (no personal data) and publishes it in the public gallery. A salted hash of the caller’s address is kept for one day to limit proposals to 5 a day.
 - `create_hcmotion` stores the generated file in a private Vercel Blob store. Anyone with the link can download it until it expires after 24 hours; a daily job deletes expired files (at most about 48 hours after creation).
 - No accounts, cookies, tracking or AI training on your content.
 
 ## Community templates (setup)
 
-Preview videos are rendered by the Studio repository's `community-render` workflow. Environment variables in this Vercel project: `GITHUB_DISPATCH_TOKEN` (fine-grained token with *Contents: read and write* on `jasp402/HyperCodeMotion`, used only to start that workflow), `COMMUNITY_RENDER_SECRET` (shared with the workflow) and `COMMUNITY_ADMIN_SECRET` (to retire a template: `POST /api/community?op=retire` with `{"id":"c-…"}`).
+The Studio repository's `community-render` workflow extracts the reference frames, renders the comparisons (sheet and `comparacion.mp4`, readable by the owner at `GET /api/community?op=compare&id=c-…&file=comparacion.mp4` with `COMMUNITY_ADMIN_SECRET`) and the gallery media. Environment variables in this Vercel project: `GITHUB_DISPATCH_TOKEN` (fine-grained token with *Contents: read and write* on `jasp402/HyperCodeMotion`, used only to start that workflow), `COMMUNITY_RENDER_SECRET` (shared with the workflow) and `COMMUNITY_ADMIN_SECRET` (to retire a template: `POST /api/community?op=retire` with `{"id":"c-…"}`).
 
 Full details: [Privacy Policy](PRIVACY.md) · [Terms of Service](TERMS.md) · [Support](SUPPORT.md)
 
