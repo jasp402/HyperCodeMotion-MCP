@@ -139,10 +139,11 @@ async function reference(src, video, { now, dispatch, wait }) {
   let meta = await getJson(refPath(src.id));
   const stuck = m => m && m.status !== "ready" && now - Date.parse(m.requested) > RETRY_MS;
   if (!meta || stuck(meta)) {
-    if (!video || !SOURCES[src.host].video.test(video)) return { status: "failed", reason: "The video of this page could not be found." };
+    // a page that does not show its video to this server (a bot check, say) is read by the job itself
+    if (video && !SOURCES[src.host].video.test(video)) video = null;
     meta = { status: "preparing", video, requested: iso(now) };
     await putJson(refPath(src.id), meta);
-    if (!(await dispatch("reference", src.id, { video }).catch(() => false))) {
+    if (!(await dispatch("reference", src.id, video ? { video } : { page: src.url }).catch(() => false))) {
       meta = { ...meta, status: "failed", reason: "The video could not be sent to be read right now; try again later." };
       await putJson(refPath(src.id), meta);
     }
@@ -347,9 +348,14 @@ export async function putRef(id, file, bytes) {
   return { ok: true };
 }
 /** Reference job finished: the video's size, duration and the times of each sheet's frames. */
-export async function finishRef(id, { ok, reason, duration, width, height, sheets }) {
+export async function finishRef(id, { ok, reason, duration, width, height, sheets, video }) {
   const m = await getJson(refPath(id));
   if (m?.status !== "preparing") return { ok: false, error: "No reference is being prepared." };
+  if (ok && !m.video) {
+    const host = Object.values(SOURCES).find(s => s.video.test(String(video)));
+    if (!host) return { ok: false, error: "video must be the source page's video." };
+    m.video = video;
+  }
   if (ok && !(num(duration, 0.5, 600) && num(width, 16, 8192) && num(height, 16, 8192) && sheets && times(sheets.general, duration) && (sheets.inicio == null || times(sheets.inicio, duration)))) return { ok: false, error: "duration, width, height and sheets.general are required." };
   const next = ok ? { ...m, status: "ready", duration, width, height, sheets: { general: sheets.general, ...(sheets.inicio ? { inicio: sheets.inicio } : {}) }, reason: null }
     : { ...m, status: "failed", reason: String(reason || "The video could not be read.").slice(0, 300) };
