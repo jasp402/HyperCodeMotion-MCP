@@ -111,11 +111,25 @@ test("comparisons are limited and an abandoned proposal frees its video", async 
   const other = await proposeTemplate({ url, compositions: compositions(), card }, { caller: "3.3.3.3", ...opts, now: later });
   assert.equal(other.accepted, true); assert.notEqual(other.code, r.code);
 });
-test("a page without a readable video is not recreated", async () => {
+test("a page that hides its video from the server is read by the reference job", async () => {
+  setStore(mem()); jobs.length = 0;
+  const noVideo = async () => ({ ok: true, text: async () => "<html>Just a moment...</html>" });
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  const b = await getRecreationBrief({ url }, { ...opts, fetcher: noVideo });
+  assert.equal(b.reference.status, "preparing");
+  assert.deepEqual(jobs.at(-1), { kind: "reference", id, page: url });
+  assert.equal((await finishRef(id, { ok: true, duration: 20, width: 1920, height: 1080, sheets: { general: [1] }, video: "https://evil.com/x.mp4" })).ok, false);
+  assert.equal((await finishRef(id, { ok: true, duration: 20, width: 1920, height: 1080, sheets: { general: [1] }, video: "https://media.prompt-motion.com/x/v.mp4" })).ok, true);
+  await proposeTemplate({ url, compositions: compositions(), card }, { caller: "4.4.4.4", ...opts, fetcher: noVideo });
+  assert.equal(jobs.at(-1).video, "https://media.prompt-motion.com/x/v.mp4");
+});
+test("a job that cannot read the video fails the brief", async () => {
   setStore(mem());
-  const noVideo = async () => ({ ok: true, text: async () => PM.replace(/"contentUrl":"[^"]+",/, "") });
-  const b = await getRecreationBrief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, { ...opts, fetcher: noVideo });
-  assert.equal(b.ok, false); assert.match(b.error, /compared/);
+  const id = "c-pm-parkerrex-1a54fe";
+  await getRecreationBrief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
+  await finishRef(id, { ok: false, reason: "el video respondió 403" });
+  const b = await getRecreationBrief({ url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
+  assert.equal(b.ok, false); assert.match(b.error, /403.*compared/);
 });
 test("daily limit per caller", async () => {
   setStore(mem());

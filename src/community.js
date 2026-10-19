@@ -113,6 +113,7 @@ export async function readSource(src, fetcher = fetch) {
     } catch { /* page layout changed: Claude reads the page itself */ }
   }
   if (out.title) out.title = text(out.title);
+  if (!out.video) out.error = `The page gave no video (${html.length} bytes${/cf-chl|challenge-platform|Just a moment/.test(html) ? ", a bot check" : ""}).`;
   return out;
 }
 
@@ -138,10 +139,11 @@ async function reference(src, video, { now, dispatch, wait }) {
   let meta = await getJson(refPath(src.id));
   const stuck = m => m && m.status !== "ready" && now - Date.parse(m.requested) > RETRY_MS;
   if (!meta || stuck(meta)) {
-    if (!video || !SOURCES[src.host].video.test(video)) return { status: "failed", reason: "The video of this page could not be found." };
+    // a page that does not show its video to this server (a bot check, say) is read by the job itself
+    if (video && !SOURCES[src.host].video.test(video)) video = null;
     meta = { status: "preparing", video, requested: iso(now) };
     await putJson(refPath(src.id), meta);
-    if (!(await dispatch("reference", src.id, { video }).catch(() => false))) {
+    if (!(await dispatch("reference", src.id, video ? { video } : { page: src.url }).catch(() => false))) {
       meta = { ...meta, status: "failed", reason: "The video could not be sent to be read right now; try again later." };
       await putJson(refPath(src.id), meta);
     }
@@ -157,7 +159,7 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
   if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a Community template (or one is being made from it). Do not recreate it: give the user this status." };
   const page = await readSource(src, fetcher);
   const ref = await reference(src, page.video, { now, dispatch, wait });
-  if (ref.status === "failed") return { ok: false, template: src.id, error: `${ref.reason || "The video could not be read."} A template is only made when it can be compared with its original video, so this one cannot be recreated now.` };
+  if (ref.status === "failed") return { ok: false, template: src.id, error: `${ref.reason || "The video could not be read."}${page.error ? ` (${page.error})` : ""} A template is only made when it can be compared with its original video, so this one cannot be recreated now.` };
   const out = {
     ok: true, alreadyExists: false, template: src.id,
     source: { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title, author: page.author, authorUrl: page.authorUrl, video: page.video },
@@ -346,9 +348,14 @@ export async function putRef(id, file, bytes) {
   return { ok: true };
 }
 /** Reference job finished: the video's size, duration and the times of each sheet's frames. */
-export async function finishRef(id, { ok, reason, duration, width, height, sheets }) {
+export async function finishRef(id, { ok, reason, duration, width, height, sheets, video }) {
   const m = await getJson(refPath(id));
   if (m?.status !== "preparing") return { ok: false, error: "No reference is being prepared." };
+  if (ok && !m.video) {
+    const host = Object.values(SOURCES).find(s => s.video.test(String(video)));
+    if (!host) return { ok: false, error: "video must be the source page's video." };
+    m.video = video;
+  }
   if (ok && !(num(duration, 0.5, 600) && num(width, 16, 8192) && num(height, 16, 8192) && sheets && times(sheets.general, duration) && (sheets.inicio == null || times(sheets.inicio, duration)))) return { ok: false, error: "duration, width, height and sheets.general are required." };
   const next = ok ? { ...m, status: "ready", duration, width, height, sheets: { general: sheets.general, ...(sheets.inicio ? { inicio: sheets.inicio } : {}) }, reason: null }
     : { ...m, status: "failed", reason: String(reason || "The video could not be read.").slice(0, 300) };

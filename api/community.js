@@ -75,7 +75,7 @@ export default async function handler(req, res) {
   if (op === "ref-done" || op === "compared") {
     if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
     const r = op === "ref-done"
-      ? await finishRef(String(data.id), { ok: data.ok === true, reason: data.reason, duration: data.duration, width: data.width, height: data.height, sheets: data.sheets })
+      ? await finishRef(String(data.id), { ok: data.ok === true, reason: data.reason, duration: data.duration, width: data.width, height: data.height, sheets: data.sheets, video: data.video })
       : await finishCompare(String(data.id), { round: data.round, ok: data.ok === true, reason: data.reason, times: data.times });
     return json(res, r.ok ? 200 : 400, r);
   }
