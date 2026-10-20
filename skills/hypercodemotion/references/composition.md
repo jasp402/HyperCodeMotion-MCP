@@ -38,11 +38,25 @@ This is an illustrative sample, not evidence of a successful real render.
 
 ## Layers and timing
 
-Supported layer types from the current contract snapshot: `text`, `rect`, `ellipse`, `polygon`, `particles`, `image`, `code`, `camera`, `svg`, `ui`, `cursor`, `html`, `component`. Query `get_capabilities` for properties per type. Layer order determines draw order (earliest at back). Use stable, unique IDs. `start` and `end` denote visible interval in composition seconds, `[start,end)`. `parent` refers to another layer ID; `clip` can mask children where supported; `fixed` remains screen-fixed through camera or scene transitions.
+Supported layer types from the current contract snapshot: `text`, `rect`, `ellipse`, `polygon`, `particles`, `image`, `video`, `code`, `camera`, `svg`, `ui`, `cursor`, `html`, `component`. Query `get_capabilities` for properties per type. Layer order determines draw order (earliest at back). Use stable, unique IDs. `start` and `end` denote visible interval in composition seconds, `[start,end)`. `parent` refers to another layer ID; `clip` can mask children where supported; `fixed` remains screen-fixed through camera or scene transitions.
 
 A property value may be fixed (number/string), `{"kf":[{"t":0,"v":0},{"t":1,"v":100,"ease":"easeOutCubic"}]}`, or `{"expr":"..."}`. Keyframe timestamps are global composition seconds. Spring targets may be specified by `spring` where supported by Studio; check actual accepted names.
 
 Optional composition structures include `scenes` (sequential periods and transitions), `docs` (HTML templates), `assets`, `audio`, `camera`, `params`, `plan`, `markers` and `components`. Do not fabricate structures: inspect Studio code for advanced fields.
+
+## The user's own files (photos, cut-outs, logo, videos)
+
+When the request lists the user's files by id (Studio's «Tus materiales», e.g. `"video-1" · «playa.mp4» · video · 1920×1080 · 12.4 s`), those files already live in the user's Studio and are filled in by id when the project opens. Nothing is uploaded to the MCP.
+
+- Image (photo, cut-out or logo): an `image` layer with `"asset": "<id>"` and its own proportion, or `<img src="asset:<id>">` inside an HTML scene.
+- Video: a `video` layer. `props.from` is the second of the file where the clip starts; the clip lasts `end - start`. Keep `from + (end - start)` within the file's duration. Videos play without sound (sound lives in Studio's audio channels). For full frame use the canvas `w`/`h`: the video is cropped to cover, never stretched.
+
+```json
+{"id":"clip1","name":"Clip · playa","type":"video","start":2,"end":5.5,"props":{"asset":"video-1","from":6.4,"x":540,"y":960,"w":1080,"h":1920}}
+```
+
+- Do not add these ids to `assets` and never use a URL for them. Use only ids the user listed; an unknown id opens as an empty slot.
+- Videos usually arrive as a sheet of frames with their seconds (`materiales-para-claude.png`): pick each clip's `from` from it.
 
 ## Editing an existing project
 

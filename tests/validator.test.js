@@ -76,3 +76,22 @@ test("rejects conflicting top-level formats", () => {
   const result = validateComposition({ ...example(), add: [] });
   assert.ok(result.errors.some(x => x.code === "AMBIGUOUS_FORMAT"));
 });
+
+test("video layers reference the user's file by id and a clip start", async () => {
+  const { validateJson, getCapabilities } = await import("../src/contract.js");
+  const { checkComposition } = await import("../src/hcmotion.js");
+  const base = { version: 1, name: "V", width: 1080, height: 1920, fps: 30, duration: 8, background: "#000", params: {} };
+  const clip = (props) => ({ ...base, layers: [{ id: "c", name: "Clip", type: "video", start: 1, end: 4, props }] });
+  const ok = validateJson(clip({ asset: "video-1", from: 3.2, w: 1080, h: 1920 }));
+  assert.equal(ok.valid, true, JSON.stringify(ok.errors));
+  assert.ok(!ok.warnings.some((w) => w.code === "UNKNOWN_LAYER_TYPE" || w.code === "UNKNOWN_PROPERTY"));
+  assert.deepEqual(checkComposition(clip({ asset: "video-1" })), []);
+  const codes = (r) => r.errors.map((e) => e.code);
+  assert.deepEqual(codes(validateJson(clip({ from: 1 }))), ["VIDEO_NEEDS_ASSET"]);
+  assert.deepEqual(codes(validateJson(clip({ asset: "https://x.test/a.mp4" }))), ["VIDEO_ASSET_NOT_ID"]);
+  assert.deepEqual(codes(validateJson(clip({ asset: "video-1", from: -2 }))), ["INVALID_CLIP_START"]);
+  const inAssets = validateJson({ ...clip({ asset: "video-1" }), assets: { "video-1": "data:video/mp4;base64,AAAA" } });
+  assert.ok(inAssets.warnings.some((w) => w.code === "VIDEO_IN_ASSETS"));
+  assert.match(getCapabilities().userMaterials, /props\.from/);
+  assert.ok(getCapabilities().layerProperties.video.includes("from"));
+});
