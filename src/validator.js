@@ -67,6 +67,7 @@ export function validateComposition(input, options = {}) {
       fail(`${p}.end`, "OUTSIDE_DURATION", "Layer end exceeds composition duration.");
     if (layer.parent !== undefined && layer.parent !== null && typeof layer.parent !== "string")
       fail(`${p}.parent`, "INVALID_PARENT", "Parent must be a layer id or null.");
+    if (layer.type === "video" && obj(layer.props)) checkVideo(layer, p, fail, warn, input.assets);
   }
   input.layers.forEach((layer, i) => {
     if (!obj(layer) || typeof layer.parent !== "string") return;
@@ -87,6 +88,22 @@ export function validateComposition(input, options = {}) {
       warnings,
     };
   }
+}
+
+/**
+ * A video layer shows the user's own file (an id from their request; Studio fills it in on open):
+ * props.from is the second of the file where its clip starts and the clip lasts end - start.
+ */
+function checkVideo(layer, p, fail, warn, assets) {
+  const { asset, from } = layer.props;
+  if (typeof asset !== "string" || !asset.trim())
+    fail(`${p}.props.asset`, "VIDEO_NEEDS_ASSET", "A video layer needs props.asset: the id of a video the user listed.");
+  else if (/^(https?:|data:|blob:)/i.test(asset))
+    fail(`${p}.props.asset`, "VIDEO_ASSET_NOT_ID", "Use the id of the user's video, not a URL or data: Studio fills it in on open.");
+  else if (obj(assets) && Object.hasOwn(assets, asset))
+    warn(`${p}.props.asset`, "VIDEO_IN_ASSETS", "The user's videos stay in Studio: reference the id without adding it to assets.");
+  if (from !== undefined && (!finite(from) || from < 0))
+    fail(`${p}.props.from`, "INVALID_CLIP_START", "props.from must be a number of seconds, 0 or more.");
 }
 
 /**
@@ -144,7 +161,7 @@ export function validateImprovement(input, { composition } = {}) {
     if (l.z !== undefined && l.z !== "fondo" && l.z !== "frente")
       warn(`${p}.z`, "UNKNOWN_Z", 'Only "fondo" and "frente" are meaningful.');
     if (typeof l.type !== "string" || !l.type) fail(`${p}.type`, "MISSING_TYPE", "New layers require a type.");
-    if (l.type === "image") warn(`${p}.type`, "IGNORED_IMAGE", "Studio discards new image layers in improvements.");
+    if (l.type === "image" || l.type === "video") warn(`${p}.type`, "IGNORED_IMAGE", "Studio discards new image and video layers in improvements.");
     if (!obj(l.props)) fail(`${p}.props`, "INVALID_PROPS", "Expected layer props object.");
     if (!finite(l.start) || !finite(l.end) || l.start < 0 || l.start >= l.end)
       fail(p, "INVALID_TIMING", "Expected 0 <= start < end.");

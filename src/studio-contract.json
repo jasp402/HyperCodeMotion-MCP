@@ -1,8 +1,8 @@
 {
   "source": "jasp402/HyperCodeMotion",
-  "sourceSchemaSha": "c4088722b2919d164401a944e5a88e633dbbec4b",
-  "sourcePresetsSha": "57593271af877058bd0b9a1b77a063dd013564b7",
-  "generatedAt": "2026-10-13",
+  "sourceSchemaSha": "fb6f8502cb87baf9980e793f619b4c8de32e65c2",
+  "sourcePresetsSha": "3b1ce95290d180668bf102b2da64ae9a75d08c8b",
+  "generatedAt": "2026-10-20",
   "types": {
     "text": [
       "text",
@@ -208,6 +208,29 @@
       "rScale",
       "rOpacity",
       "rDelay"
+    ],
+    "video": [
+      "asset",
+      "from",
+      "w",
+      "h",
+      "radius",
+      "reveal",
+      "x",
+      "y",
+      "scale",
+      "scaleX",
+      "scaleY",
+      "rotation",
+      "opacity",
+      "depth",
+      "rotateX",
+      "rotateY",
+      "perspective",
+      "glow",
+      "glowColor",
+      "blur",
+      "blend"
     ],
     "code": [
       "w",

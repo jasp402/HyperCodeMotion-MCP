@@ -44,7 +44,7 @@ Load only the applicable reference files instead of pasting all reference conten
 
 ## Non-negotiable truthfulness
 
-`validate_json` currently performs **structural preflight** against a source-pinned capability snapshot, returns `fullyValidated: false`, and **cannot verify appearance or guarantee Studio import/rendering**. Images in a prompt are references; they are not automatically embedded in JSON. Never invent asset IDs, live external image URLs, render results, tool calls, or successful tests.
+`validate_json` currently performs **structural preflight** against a source-pinned capability snapshot, returns `fullyValidated: false`, and **cannot verify appearance or guarantee Studio import/rendering**. Images in a prompt are references; they are not automatically embedded in JSON. The exception is files the user lists by id (photos, cut-outs, a logo, videos kept in their Studio): reference those ids in `image` and `video` layers as [the contract](references/composition.md) describes. Never invent other asset IDs, live external image URLs, render results, tool calls, or successful tests.
 
 ## Output contract
 

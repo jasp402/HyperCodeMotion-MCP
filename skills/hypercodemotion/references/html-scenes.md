@@ -33,7 +33,7 @@ Use HTML scenes for precise editorial layouts, dashboards and typographic compos
 
 ## Image assets
 
-A photo in a user prompt is a **reference**, not automatically an embedded asset. Composition `assets` maps asset IDs to actual data URLs; image layers must use an asset/source format Studio supports. Verify IDs and actual media availability instead of inventing a Pexels image URL, claiming a fetch succeeded, or fabricating a brand logo.
+Files the user lists by id stay in their Studio: use `<img src="asset:<id>">` or an `image`/`video` layer with that id (see [composition](composition.md)). Any other photo in a user prompt is a **reference**, not automatically an embedded asset. Composition `assets` maps asset IDs to actual data URLs; image layers must use an asset/source format Studio supports. Verify IDs and actual media availability instead of inventing a Pexels image URL, claiming a fetch succeeded, or fabricating a brand logo.
 
 An external asset may require Studio to fetch and embed it. If not available, supply an explicitly labelled placeholder and state what is required to complete import. Avoid remote dependencies for reproducible compositions when assets can be bundled.
 
