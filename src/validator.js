@@ -70,6 +70,9 @@ export function validateComposition(input, options = {}) {
     if (layer.parent !== undefined && layer.parent !== null && typeof layer.parent !== "string")
       fail(`${p}.parent`, "INVALID_PARENT", "Parent must be a layer id or null.");
     if (layer.type === "video" && obj(layer.props)) checkVideo(layer, p, fail, warn, input.assets);
+    if (layer.type === "runtime" && obj(layer.props)) checkRuntime(layer, p, fail, warn, input.assets);
+    if (layer.type === "html" && obj(layer.props) && obj(layer.props.text) && typeof layer.props.text.expr === "string")
+      warn(`${p}.props.text`, "HTML_TEXT_SAMPLED", "HTML text is sampled once per frame. Text that changes on every frame for a long time should be a text layer, which the engine paints directly.");
   }
   if (finite(input.width) && finite(input.height) && input.width > 0 && input.height > 0) {
     const fit = textFitIssues(input);
@@ -101,6 +104,26 @@ export function validateComposition(input, options = {}) {
  * A video layer shows the user's own file (an id from their request; Studio fills it in on open):
  * props.from is the second of the file where its clip starts and the clip lasts end - start.
  */
+/**
+ * A runtime layer keeps an existing Lottie, glTF or GSAP file and seeks it.
+ * The original bytes stay in assets. This check does not open or render the file.
+ */
+function checkRuntime(layer, p, fail, warn, assets) {
+  const { engine, asset } = layer.props;
+  if (engine !== undefined && engine !== "lottie" && engine !== "three" && engine !== "gsap")
+    fail(`${p}.props.engine`, "RUNTIME_ENGINE", "props.engine must be lottie, three or gsap.");
+  if (typeof asset !== "string" || !asset.trim())
+    fail(`${p}.props.asset`, "RUNTIME_ASSET_MISSING", "A runtime layer needs props.asset: the id of the Lottie, glTF or HTML file.");
+  else if (/^(https?:|data:|blob:)/i.test(asset))
+    fail(`${p}.props.asset`, "RUNTIME_ASSET_NOT_ID", "props.asset is an id in assets, not a URL. The original file stays in assets.");
+  else if (obj(assets)) {
+    if (!Object.hasOwn(assets, asset))
+      fail(`${p}.props.asset`, "RUNTIME_ASSET_MISSING", `assets has no "${asset}".`);
+  } else
+    warn(`${p}.props.asset`, "RUNTIME_ASSET_UNCHECKED", "assets was omitted, so the file was not checked.");
+  warn(p, "RUNTIME_SEEK", "Studio seeks this file on the project clock. A script that only moves forward will not scrub. This check does not render it.");
+}
+
 function checkVideo(layer, p, fail, warn, assets) {
   const { asset, from } = layer.props;
   if (typeof asset !== "string" || !asset.trim())

@@ -42,9 +42,11 @@ Decide `width` and `height` before any type size. `get_capabilities` returns the
 
 ## Layers and timing
 
-Supported layer types from the current contract snapshot: `text`, `rect`, `ellipse`, `polygon`, `particles`, `image`, `video`, `code`, `camera`, `svg`, `ui`, `cursor`, `html`, `component`. Query `get_capabilities` for properties per type. Layer order determines draw order (earliest at back). Use stable, unique IDs. `start` and `end` denote visible interval in composition seconds, `[start,end)`. `parent` refers to another layer ID; `clip` can mask children where supported; `fixed` remains screen-fixed through camera or scene transitions.
+Supported layer types from the current contract snapshot: `text`, `rect`, `ellipse`, `polygon`, `particles`, `image`, `video`, `code`, `camera`, `svg`, `ui`, `cursor`, `html`, `runtime`, `component`. Query `get_capabilities` for properties per type. Layer order determines draw order (earliest at back). Use stable, unique IDs. `start` and `end` denote visible interval in composition seconds, `[start,end)`. `parent` refers to another layer ID; `clip` can mask children where supported; `fixed` remains screen-fixed through camera or scene transitions.
 
 A property value may be fixed (number/string), `{"kf":[{"t":0,"v":0},{"t":1,"v":100,"ease":"easeOutCubic"}]}`, or `{"expr":"..."}`. Keyframe timestamps are global composition seconds. Spring targets may be specified by `spring` where supported by Studio; check actual accepted names.
+
+Do not redraw an existing Lottie, glTF or GSAP file as rects or HTML pieces. Emit one `runtime` layer: `engine` is `lottie`, `three` or `gsap`; `asset` is the id of the original file inside `assets`; `text`, `color`, `node` and `clip` are optional patches. The original bytes stay in `assets`. Sound stays in the audio channels. A script that only advances on its own will not scrub. `validate_json` does not render it. HTML text that changes on every frame for a long time is a native `text` layer.
 
 Optional composition structures include `scenes` (sequential periods and transitions), `docs` (HTML templates), `assets`, `audio`, `camera`, `params`, `plan`, `markers` and `components`. Do not fabricate structures: inspect Studio code for advanced fields.
 

@@ -13,7 +13,7 @@
  */
 const MAGIC = [0x48, 0x43, 0x4d];
 const HEAD = 48;
-const LAYER_TYPES = new Set(["text","rect","ellipse","polygon","particles","image","video","code","camera","svg","ui","cursor","html","component"]);
+const LAYER_TYPES = new Set(["text","rect","ellipse","polygon","particles","image","video","code","camera","svg","ui","cursor","html","component","runtime"]);
 const isObj = x => !!x && typeof x === "object" && !Array.isArray(x);
 const num = x => typeof x === "number" && Number.isFinite(x);
 

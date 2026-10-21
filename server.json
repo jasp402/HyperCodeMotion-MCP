@@ -3,7 +3,7 @@
   "name": "io.github.jasp402/hypercodemotion-mcp",
   "title": "HyperCodeMotion MCP",
   "description": "Validate AI-made motion graphics and package them as editable HyperCodeMotion projects.",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "repository": {
     "url": "https://github.com/jasp402/HyperCodeMotion-MCP",
     "source": "github"
