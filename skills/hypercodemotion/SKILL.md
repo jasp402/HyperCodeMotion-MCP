@@ -41,6 +41,7 @@ Load only the applicable reference files instead of pasting all reference conten
 - Exact textual and numerical facts respected; no placeholder assets masquerading as real images.
 - Compositions remain editable: descriptive layer names/IDs, coherent layers, keyframes and asset references.
 - Layer effects and properties selected from actual Studio capabilities, not guessed APIs.
+- An existing Lottie, glTF or GSAP file stays one `runtime` layer (`engine`, asset id, optional text, color, node and clip). Do not redraw it as rects. Sound stays in the audio channels. `validate_json` does not render it.
 
 ## Non-negotiable truthfulness
 

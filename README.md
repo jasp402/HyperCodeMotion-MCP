@@ -28,7 +28,7 @@ Both links expire **24 hours** after they are created. Save the project from Stu
 
 | Tool | What it does | Annotations |
 | --- | --- | --- |
-| `get_capabilities` | Lists the formats, layer types, layer properties and effect presets that Studio supports, how to reference files the user keeps in Studio (photos, logo, video clips) by id, the screen rule that decides type size, and the Studio revision they come from. | read-only |
+| `get_capabilities` | Lists the formats, layer types, layer properties and effect presets that Studio supports, how to reference files the user keeps in Studio (photos, logo, video clips) by id, the screen rule that decides type size, a runtime layer that keeps an existing Lottie, glTF or GSAP file and seeks it, and the Studio revision they come from. | read-only |
 | `create_hcmotion` | Validates a finished composition and packages it as a `.hcmotion` file. Invalid input returns `created: false` with the errors to fix and stores nothing. Valid input returns `open` and `download` links (24 h). | write (creates a temporary file), not destructive |
 | `get_template` | Returns the full design of a Studio gallery template by its id and format (brief, scenes, HTML scene documents and layers), to use as a design reference. | read-only |
 | `validate_json` | Checks a composition, design or improvement patch and returns errors and warnings. Rejects measurable text that cannot fit the canvas and line-height below 1. It does not prove a correct render. | read-only |
