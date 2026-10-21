@@ -1,5 +1,6 @@
 import contract from "./studio-contract.json" with { type: "json" };
 import { validateComposition } from "./validator.js";
+import { screenRule } from "./frame.js";
 
 /** The user's own files («Tus materiales» in Studio): referenced by id, never uploaded here. */
 const USER_MATERIALS = "Files the user listed by id in their request (photos, cut-outs, a logo, videos) stay in Studio and are filled in by id when the project opens. Reference them with props.asset = <id>: an image as an \"image\" layer (or <img src=\"asset:<id>\"> in an HTML scene), a video as a \"video\" layer whose props.from is the second of the file where the shown clip starts; the clip lasts end - start and plays without sound. Do not put them in \"assets\" or as URLs, and use only ids the user gave.";
@@ -10,6 +11,7 @@ export function getCapabilities() {
     formats: ["composition", "design", "improvement"],
     layerProperties: contract.types, presetSlots: contract.presets,
     userMaterials: USER_MATERIALS,
+    screen: screenRule(),
     fullyValidated: false };
 }
 

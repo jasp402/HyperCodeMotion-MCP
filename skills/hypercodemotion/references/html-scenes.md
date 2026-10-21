@@ -21,11 +21,13 @@ A complete, working example lives in [examples/html-scene-launch.json](../exampl
 ## Recipe that works in Studio
 
 - One document per scene (`s1`, `s2`…), sized exactly to the canvas: `html,body{width:<W>px;height:<H>px;margin:0;background:transparent}`.
-- Position each piece absolutely and give it `data-hcm`. Add `width:max-content` to text pieces so Studio measures the text, not the full row.
+- Position each piece absolutely and give it `data-hcm`. Add `width:max-content` to text pieces so Studio measures the text, not the full row. Use `line-height` of at least 1 so the box wraps the glyphs.
 - One `html` layer for the base (`part: ""`) plus one per part, with staggered `start` times and an `fx.in` entrance (`rise`, `pop`, `fade`…; read the list from `get_capabilities`).
 - Name layers for humans (`s1 · titular`) so they are easy to find in the editor.
 - Load fonts with a Google Fonts `<link>` in the document head.
 - Big headlines: letter-spacing no tighter than `-0.03em`.
+
+Type size follows the screen rule in [composition.md](composition.md) (`get_capabilities` field `screen`). Do not copy a fixed pixel size from another ratio.
 
 ## Choosing layers
 
@@ -39,4 +41,4 @@ An external asset may require Studio to fetch and embed it. If not available, su
 
 ## Merging document-driven scenes
 
-Namespace document IDs (`s1`, `s2`) and `data-hcm` parts; create corresponding HTML layers with the correct scene times; preserve shared brand elements across cuts. Avoid untrusted or unnecessary external scripts in HTML. The MCP structural validator does not execute or visually verify embedded HTML.
+Namespace document IDs (`s1`, `s2`) and `data-hcm` parts; create corresponding HTML layers with the correct scene times; preserve shared brand elements across cuts. Avoid untrusted or unnecessary external scripts in HTML. The MCP structural validator does not execute or visually verify embedded HTML. It does reject `line-height` below 1 and a `font-size` in px whose text cannot fit the safe area.

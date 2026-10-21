@@ -11,7 +11,7 @@
 
 ## What validation proves
 
-Current MCP validation is structural preflight against a source-pinned capability snapshot. It reports `fullyValidated: false`. Therefore `valid: true` does not certify visual quality, rendering, animation smoothness, exact asset resolution, or acceptance of every feature by Studio.
+Current MCP validation is structural preflight against a source-pinned capability snapshot, plus a measurement of whether text can fit the canvas. It rejects measurable native text and HTML pieces that cannot fit the safe area, text that crosses the canvas, and `line-height` below 1. It warns when text sits in the margin. It reports `fullyValidated: false`. Therefore `valid: true` does not certify visual quality, rendering, animation smoothness, exact asset resolution, or acceptance of every feature by Studio. Expressions, parented placement, rotation, shadows and filters are not measured.
 
 If the MCP is not connected, never claim it was used. If no preview has been inspected, never state that the result rendered successfully.
 

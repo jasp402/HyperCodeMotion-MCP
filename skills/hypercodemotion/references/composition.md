@@ -27,14 +27,18 @@ Studio's core also knows design specs (root `elements`) and improvement patches 
       "type": "text",
       "start": 0.2,
       "end": 5.8,
-      "props": {"text": "HyperCodeMotion", "x": 540, "y": 960, "size": 96, "color": "#E8F27A"},
+      "props": {"text": "HyperCodeMotion", "x": 540, "y": 960, "size": 90, "color": "#E8F27A"},
       "fx": {"in": {"id": "rise", "dur": 0.5, "amount": 1}}
     }
   ]
 }
 ```
 
-This is an illustrative sample, not evidence of a successful real render.
+This is an illustrative sample for this 1080×1920 canvas, not evidence of a successful real render. Do not copy its pixel size onto another ratio.
+
+## Type size follows the screen
+
+Decide `width` and `height` before any type size. `get_capabilities` returns the rule and the numbers in `screen` (the same figures Studio calls PANTALLA). Fit the words inside that safe area: lower the size or wrap lines when they do not fit. `line-height` is at least 1, so the box wraps the glyphs instead of cropping them. The canvas crops whatever still falls outside the frame. `validate_json` rejects measurable text that does not fit, text that crosses the canvas, and `line-height` below 1. It warns when text sits in the margin. It still does not render the picture (`fullyValidated` stays false).
 
 ## Layers and timing
 

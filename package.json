@@ -1,6 +1,6 @@
 {
   "name": "@hypercodemotion/mcp",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "type": "module",
   "scripts": {

@@ -14,7 +14,7 @@ This support page applies only to the **HyperCodeMotion MCP integration**, not t
 - `get_capabilities` — read the supported layer/property/preset snapshot
 - `create_hcmotion` — validate a finished composition and return `open` and `download` links to its `.hcmotion` file (valid 24 hours)
 - `get_template` — the full design of a Studio gallery template, by its id and format
-- `validate_json` — preliminary structural checks for compositions, designs, and improvement patches
+- `validate_json` — structural checks for compositions, designs, and improvement patches, including whether measurable text fits the canvas. Not a render guarantee.
 
 ## Common problems
 - **Claude says the connector is not connected:** add `https://mcp.hypercodemotion.com/mcp` as a custom connector (Settings → Connectors → Add custom connector) and turn it on in the chat.

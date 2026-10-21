@@ -2,7 +2,9 @@
  * Structural validator for HyperCodeMotion JSON.
  * This is a conservative preflight, NOT the complete Studio contract validator.
  * It never evaluates code, expressions, SVG, HTML or user supplied scripts.
+ * It does measure whether text can fit the canvas (see textfit.js). That is still not a render.
  */
+import { textFitIssues } from "./textfit.js";
 const obj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
 const finite = (x) => typeof x === "number" && Number.isFinite(x);
 const issue = (path, code, message) => ({ path, code, message });
@@ -68,6 +70,11 @@ export function validateComposition(input, options = {}) {
     if (layer.parent !== undefined && layer.parent !== null && typeof layer.parent !== "string")
       fail(`${p}.parent`, "INVALID_PARENT", "Parent must be a layer id or null.");
     if (layer.type === "video" && obj(layer.props)) checkVideo(layer, p, fail, warn, input.assets);
+  }
+  if (finite(input.width) && finite(input.height) && input.width > 0 && input.height > 0) {
+    const fit = textFitIssues(input);
+    for (const item of fit.errors) errors.push(item);
+    for (const item of fit.warnings) warnings.push(item);
   }
   input.layers.forEach((layer, i) => {
     if (!obj(layer) || typeof layer.parent !== "string") return;
@@ -189,6 +196,9 @@ export function validateImprovement(input, { composition } = {}) {
       warn(`${p}.t`, "OUTSIDE_DURATION", "SFX may be omitted outside project duration.");
   });
   if (!existingIds) warn("$", "PROJECT_CONTEXT_MISSING", "Changes, removals and timing need the existing project for full validation.");
+  const fit = textFitIssues(input, composition);
+  for (const item of fit.errors) errors.push(item);
+  for (const item of fit.warnings) warnings.push(item);
   warn("$", "CONTRACT_NOT_CHECKED", "Call Studio applyImprovement for exact normalization, presets and rendered output.");
   return report();
 }

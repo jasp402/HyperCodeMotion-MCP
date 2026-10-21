@@ -13,7 +13,7 @@ Create a compact design system before building layers:
 - Consistent visual metaphors; transitions connect related elements.
 - A stable focal point; keep secondary decorations subordinate.
 
-For mobile vertical content, design at the actual 1080×1920 canvas and inspect legibility at phone size. Treat numerical guidelines (e.g. generous margin and display-sized titles) as art-direction heuristics, not hard-coded Studio rules.
+For mobile vertical content, design at the actual 1080×1920 canvas and inspect legibility at phone size. Type size and margins follow the screen rule in [composition.md](composition.md): the canvas wins over a requested size, and vertical formats keep a larger top and bottom margin.
 
 ## Working from references
 
