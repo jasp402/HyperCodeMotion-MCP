@@ -36,7 +36,7 @@ Load only the applicable reference files instead of pasting all reference conten
 - Clear narrative and design hierarchy; readable at target size.
 - Deliberate transitions; motion supports meaning rather than decorating every element.
 - Consistent colors, type, spacing and asset treatment across scenes.
-- No overlaps, cropped labels, flicker, unintentional empty frames or jumps in continuity (visually verify in Studio; do not assert without rendering).
+- No overlaps, cropped labels, flicker, unintentional empty frames or jumps in continuity (visually verify in Studio; do not assert without rendering). Type size yields to the canvas: see [composition.md](references/composition.md).
 - Headlines read as separate words: keep letter-spacing at or above `-0.03em` for big type (tighter makes «Escribe menos» look like one word).
 - Exact textual and numerical facts respected; no placeholder assets masquerading as real images.
 - Compositions remain editable: descriptive layer names/IDs, coherent layers, keyframes and asset references.
@@ -44,7 +44,7 @@ Load only the applicable reference files instead of pasting all reference conten
 
 ## Non-negotiable truthfulness
 
-`validate_json` currently performs **structural preflight** against a source-pinned capability snapshot, returns `fullyValidated: false`, and **cannot verify appearance or guarantee Studio import/rendering**. Images in a prompt are references; they are not automatically embedded in JSON. The exception is files the user lists by id (photos, cut-outs, a logo, videos kept in their Studio): reference those ids in `image` and `video` layers as [the contract](references/composition.md) describes. Never invent other asset IDs, live external image URLs, render results, tool calls, or successful tests.
+`validate_json` performs **structural preflight** against a source-pinned capability snapshot and rejects measurable text that cannot fit the canvas (`get_capabilities` field `screen`), text that crosses the canvas, and `line-height` below 1. It returns `fullyValidated: false` and **cannot verify appearance or guarantee Studio import/rendering**. Images in a prompt are references; they are not automatically embedded in JSON. The exception is files the user lists by id (photos, cut-outs, a logo, videos kept in their Studio): reference those ids in `image` and `video` layers as [the contract](references/composition.md) describes. Never invent other asset IDs, live external image URLs, render results, tool calls, or successful tests.
 
 ## Output contract
 

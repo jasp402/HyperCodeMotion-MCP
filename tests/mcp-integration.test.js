@@ -62,6 +62,16 @@ test("get_capabilities returns recognized layer types and fx", async () => {
   assert.ok(out.layerProperties.particles.includes("speedVar"));
   assert.ok(out.presetSlots.draw.includes("in"));
   assert.equal(out.fullyValidated,false);
+  assert.match(out.screen, /canvas format decides type size/);
+});
+test("create_hcmotion refuses text that does not fit the screen and stores nothing", async () => {
+  const c = composition();
+  c.layers[0].props = { text: "Your model is ready.", x: 540, y: 960, size: 200 };
+  const r = await request("POST", tool("create_hcmotion", { json: c }));
+  const out = JSON.parse(r.body.result.content[0].text);
+  assert.equal(out.created, false);
+  assert.equal(r.body.result.isError, true);
+  assert.ok(out.errors.some((e) => e.code === "TEXT_DOES_NOT_FIT"));
 });
 test("validate_json accepts JSON object and JSON string", async () => {
   for(const value of [composition(),JSON.stringify(composition())]) {

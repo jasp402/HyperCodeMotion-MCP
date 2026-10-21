@@ -6,7 +6,7 @@ import handler from "../api/community.js";
 
 const mem = () => { const m = new Map(); return { m, put: async (p, d) => { m.set(p, typeof d === "string" ? new TextEncoder().encode(d) : new Uint8Array(d)); }, get: async p => m.get(p) ?? null }; };
 const comp = (w, h) => ({ version: 1, name: "x", width: w, height: h, fps: 30, duration: 10, background: "#000", params: {},
-  layers: [{ id: "t", type: "text", start: 0, end: 10, props: { text: "HyperCodeMotion", x: w / 2, y: h / 2 } }] });
+  layers: [{ id: "t", type: "text", start: 0, end: 10, props: { text: "HyperCodeMotion", x: w / 2, y: h / 2, size: 72 } }] });
 const compositions = () => ({ cuadrado: comp(1080, 1080), vertical: comp(1080, 1920), horizontal: comp(1920, 1080) });
 const card = { name: "Cubo de fichas", description: "Un limitador de fichas explicado en canvas", chips: ["Datos", "Canvas", "Técnico"], group: "data", moments: [["Tráfico", 0, 4], ["Ráfaga", 4, 10]] };
 const PM = `<title>Token bucket rate limiter · Prompt Motion</title><script>{"contentUrl":"https://media.prompt-motion.com/x/video.b1.mp4","creator":{"@type":"Person","name":"Parker Rex","url":"https://x.com/ParkerRex"}}</script><div id="entry-prompt" class="a">explain a token bucket &amp; more</div>`;

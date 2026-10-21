@@ -9,7 +9,7 @@ HyperCodeMotion MCP is a public integration service for discovering supported Hy
 `create_hcmotion` stores the generated file temporarily and returns links to open or download it. The links expire 24 hours after creation and the file is then deleted (see the [Privacy Policy](PRIVACY.md)). The service is not a storage or backup service: save your project from HyperCodeMotion Studio to keep it.
 
 ## 2. Preliminary validation only
-A result marked `valid: true` (or `created: true`) means the submitted data passed the checks currently implemented by this MCP. It **does not** guarantee that HyperCodeMotion Studio will import, interpret, or render the JSON as intended. Results currently include `fullyValidated: false`. The supported capabilities catalog is a snapshot and may lag behind updates to Studio.
+A result marked `valid: true` (or `created: true`) means the submitted data passed the checks currently implemented by this MCP, including whether text the server can measure fits the composition canvas and whether line-height is at least 1. It **does not** guarantee that HyperCodeMotion Studio will import, interpret, or render the JSON as intended. Results currently include `fullyValidated: false`. The supported capabilities catalog is a snapshot and may lag behind updates to Studio.
 
 ## 3. Use and restrictions
 You may use the service for legitimate development, learning, and project validation. Do not use it to disrupt availability, bypass security controls, submit malicious traffic, probe other systems without authorization, or infringe others' rights. Do not include credentials or sensitive personal information in JSON submitted to the service.
