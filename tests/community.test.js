@@ -160,24 +160,31 @@ test("comparisons are limited and an abandoned proposal frees its video", async 
   const other = await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...opts, now: later });
   assert.equal(other.accepted, true); assert.notEqual(other.code, r.code);
 });
-test("a page that refuses this server is read by the caller's Claude", async () => {
+test("a page that refuses this server: the moderator drops the video on the upload page", async () => {
   setStore(mem()); jobs.length = 0;
   const blocked = async () => ({ ok: false, status: 403, text: async () => "" });
   const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
   const o = { ...opts, fetcher: blocked };
-  const first = await brief({ ...A, url }, o);
-  assert.equal(first.ok, false); assert.equal(first.needsPage, true); assert.match(first.error, /403/); assert.equal(jobs.length, 0);
-  assert.match((await brief({ ...A, url, video: "https://evil.com/x.mp4" }, o)).error, /media\.prompt-motion\.com/);
-  const b = await brief({ ...A, url, video: "https://media.prompt-motion.com/x/v.mp4", prompt: "a ball and rings", title: "Rings", author: "Kent", authorUrl: "javascript:alert(1)" }, o);
-  assert.equal(b.ok, true); assert.equal(b.reference.status, "preparing"); assert.equal(b.prompt, "a ball and rings"); assert.equal(b.source.authorUrl, null);
-  assert.deepEqual(jobs.at(-1), { kind: "reference", id, video: "https://media.prompt-motion.com/x/v.mp4", upload: 1 });
+  assert.match((await getRecreationBrief({ ...A, url, video: "https://evil.com/x.mp4" }, o)).error, /media\.prompt-motion\.com/);
+  // no video address: an upload page instead of guessing it
+  const first = await getRecreationBrief({ ...A, url, prompt: "a ball and rings", title: "Rings", author: "Kent", authorUrl: "javascript:alert(1)" }, o);
+  assert.equal(first.ok, true); assert.equal(first.reference.status, "upload"); assert.equal(first.upload.script, undefined);
+  assert.match(first.upload.page, /\/subir\/c-pm-parkerrex-1a54fe\/[0-9a-f]{32}$/); assert.match(first.message, /Save video as/);
+  assert.equal(first.prompt, "a ball and rings"); assert.equal(first.source.authorUrl, null); assert.equal(jobs.length, 0);
+  const key = first.upload.page.split("/").pop();
+  assert.equal((await putUpload(id, key, 0, MP4)).ok, true);
+  assert.equal((await finishUpload(id, key, 1, o)).ok, true);
+  assert.deepEqual(jobs.at(-1), { kind: "reference", id, video: null, upload: 1 });
   await referenceReady(id);
-  assert.equal((await brief({ ...A, url }, o)).reference.status, "ready", "once extracted, the video is not needed again");
+  assert.equal((await getRecreationBrief({ ...A, url }, o)).reference.status, "ready", "once extracted, the video is not needed again");
   const r = await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...o });
-  assert.equal(jobs.at(-1).video, "https://media.prompt-motion.com/x/v.mp4");
+  assert.deepEqual([jobs.at(-1).kind, jobs.at(-1).video, jobs.at(-1).upload], ["compare", null, 1]);
   await compared(id, 1);
   await publishTemplate({ ...A, code: r.code, notes: "Nada" }, { ...o, fetcher: studio });
   assert.equal((await readRecord(id)).source.author, "Kent");
+  // a source the server can download still needs its address
+  const os = await getRecreationBrief({ ...A, url: "https://oneshotted.io/v/one-shape-loop" }, o);
+  assert.equal(os.ok, false); assert.equal(os.needsPage, true);
 });
 test("a job that cannot read the video fails the brief", async () => {
   setStore(mem());
@@ -232,4 +239,11 @@ test("prompt-motion's video is sent by the caller's Claude in parts", async () =
   assert.equal(await get({ authorization: "Bearer s3cret" }), 200);
   const os = await getRecreationBrief({ ...A, url: "https://oneshotted.io/v/one-shape-loop", video: "https://r2.oneshotted.io/a/b.mp4" }, { ...opts, fetcher: async () => ({ ok: false, status: 403, text: async () => "" }) });
   assert.equal(os.reference.status, "preparing", "other sources are still downloaded by the job");
+});
+test("the upload page only opens with a valid id and key", async () => {
+  const { default: page } = await import("../api/subir.js");
+  const call = q => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(v) { this.body = v; } }; page({ method: "GET", query: q, url: "/" }, res); return res; };
+  assert.equal(call({ id: "c-pm-x1a", key: "z" }).statusCode, 404);
+  const ok = call({ id: "c-pm-parkerrex-1a54fe", key: "a".repeat(32) });
+  assert.equal(ok.statusCode, 200); assert.match(ok.body, /op=upload&part=/); assert.match(ok.body, /c-pm-parkerrex-1a54fe/);
 });

@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/subir/:id/:key",
+      "destination": "/api/subir?id=:id&key=:key"
+    },
+    {
       "source": "/mcp",
       "destination": "/api/mcp"
     },

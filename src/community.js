@@ -172,8 +172,9 @@ async function reference(src, info, { now, dispatch, wait }) {
   // a job that could not be started is tried again at once; one that started gets RETRY_MS to answer
   const stuck = m => m && m.status !== "ready" && (m.status === "upload" ? now - Date.parse(m.requested) > UPLOAD_MS : m.notSent || now - Date.parse(m.requested) > RETRY_MS);
   if (!meta || stuck(meta)) {
-    if (!info.video) return { status: "missing" };
-    meta = { status: "preparing", video: info.video, requested: iso(now), info: { title: info.title, author: info.author, authorUrl: info.authorUrl } };
+    // a source that refuses servers gets its video from the moderator (upload page), so its address is optional
+    if (!info.video && !SOURCES[src.host].callerSends) return { status: "missing" };
+    meta = { status: "preparing", video: info.video || null, requested: iso(now), info: { title: info.title, author: info.author, authorUrl: info.authorUrl } };
     if (SOURCES[src.host].callerSends) {
       meta = { ...meta, status: "upload", key: randomBytes(16).toString("hex") };
       await putJson(refPath(src.id), meta);
@@ -222,11 +223,16 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
   };
   if (ref.status === "upload") {
     const send = `${PUBLIC_URL}/api/community?id=${src.id}&key=${ref.key}`;
+    const page = `${PUBLIC_URL}/subir/${src.id}/${ref.key}`;
+    if (!ref.video) return {
+      ...out, reference: { status: "upload" }, upload: { page },
+      message: `${src.site} does not let servers (or most AI sandboxes) download its videos. Give the user this link and nothing else to do: ${page} . They download the video from the page (${src.url}: right-click the video → «Save video as…»), open the link and drop the file there; the page sends it. Wait until they say it is done, then call get_recreation_brief again with the same url and adminCode. Do not guess the video's address.`
+    };
     return {
       ...out, reference: { status: "upload" },
-      upload: { video: ref.video, partBytes: PART_BYTES, maxParts: MAX_PARTS, part: `${send}&op=upload&part=<n>`, done: `${send}&op=upload-done&parts=<count>`,
+      upload: { page, video: ref.video, partBytes: PART_BYTES, maxParts: MAX_PARTS, part: `${send}&op=upload&part=<n>`, done: `${send}&op=upload-done&parts=<count>`,
         script: `set -e; curl -sfL "${ref.video}" -o original.mp4; split -b ${PART_BYTES} -d -a 2 original.mp4 part.; n=0; for f in part.*; do curl -sf -H "content-type: application/octet-stream" --data-binary @"$f" "${send}&op=upload&part=$n" >/dev/null; n=$((n+1)); done; curl -sf -X POST "${send}&op=upload-done&parts=$n"` },
-      message: `${src.site} does not let servers download its videos, so you send it: run upload.script in your code or shell tool (it downloads the video and sends it here in parts; it needs network access to ${SOURCES[src.host].videoHost} and ${new URL(PUBLIC_URL).host}). Then call get_recreation_brief again with the same url. If your shell cannot reach those hosts, use a browser tool instead: open upload.video in it and, on that page, fetch it (same origin) and POST each part of up to partBytes bytes to upload.part with no content-type, then POST upload.done. If you have neither, tell the user this video cannot be recreated from here.`
+      message: `${src.site} does not let servers download its videos, so you send it: run upload.script in your code or shell tool (it downloads the video and sends it here in parts; it needs network access to ${SOURCES[src.host].videoHost} and ${new URL(PUBLIC_URL).host}). Then call get_recreation_brief again with the same url. If your shell cannot reach those hosts, use a browser tool instead: open upload.video in it and, on that page, fetch it (same origin) and POST each part of up to partBytes bytes to upload.part with no content-type, then POST upload.done. If you have neither, or they fail, give the user upload.page: they download the video from the page, open that link and drop the file there; then call get_recreation_brief again.`
     };
   }
   if (ref.status !== "ready") return { ...out, reference: { status: "preparing" }, message: "The original video is being downloaded and its reference frames extracted (usually one or two minutes). Read the prompt meanwhile, then call get_recreation_brief again with the same url. Do not build anything before you have seen the frames." };
