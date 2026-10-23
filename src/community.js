@@ -37,8 +37,9 @@ import { PUBLIC_URL, STUDIO_URL } from "./files.js";
 
 export const SOURCES = {
   "prompt-motion.com": { name: "Prompt Motion", path: /^\/([a-z0-9][a-z0-9_-]{2,80})\/?$/, prefix: "pm", videoHost: "media.prompt-motion.com", video: /^https:\/\/media\.prompt-motion\.com\/[^\s"']+\.mp4$/,
-    // its videos answer 403 to every server (Vercel, GitHub), so the caller's Claude downloads it and sends it here
-    callerSends: true },
+    // it answers 403 to this server (Node), but the Studio job reads the page and downloads the video itself;
+    // if that ever fails, the moderator drops the video on the upload page
+    byPage: true, uploadFallback: true },
   "oneshotted.io": { name: "Oneshotted", path: /^\/v\/([a-z0-9][a-z0-9-]{2,120})\/?$/, prefix: "os", videoHost: "r2.oneshotted.io", video: /^https:\/\/r2\.oneshotted\.io\/[^\s"']+\.mp4$/ }
 };
 export const MAX_PER_DAY = 20;
@@ -172,8 +173,8 @@ async function reference(src, info, { now, dispatch, wait }) {
   // a job that could not be started is tried again at once; one that started gets RETRY_MS to answer
   const stuck = m => m && m.status !== "ready" && (m.status === "upload" ? now - Date.parse(m.requested) > UPLOAD_MS : m.notSent || now - Date.parse(m.requested) > RETRY_MS);
   if (!meta || stuck(meta)) {
-    // a source that refuses servers gets its video from the moderator (upload page), so its address is optional
-    if (!info.video && !SOURCES[src.host].callerSends) return { status: "missing" };
+    // a source whose page the Studio job can read does not need the video's address
+    if (!info.video && !SOURCES[src.host].byPage) return { status: "missing" };
     meta = { status: "preparing", video: info.video || null, requested: iso(now), info: { title: info.title, author: info.author, authorUrl: info.authorUrl } };
     if (SOURCES[src.host].callerSends) {
       meta = { ...meta, status: "upload", key: randomBytes(16).toString("hex") };
@@ -181,12 +182,18 @@ async function reference(src, info, { now, dispatch, wait }) {
       return meta;
     }
     await putJson(refPath(src.id), meta);
-    if (!(await dispatch("reference", src.id, { video: info.video }).catch(() => false))) {
+    if (!(await dispatch("reference", src.id, info.video ? { video: info.video } : { page: src.url }).catch(() => false))) {
       meta = { ...meta, status: "failed", notSent: true, reason: "The video could not be sent to be read right now; try again later." };
       await putJson(refPath(src.id), meta);
     }
   }
-  return waitFor(refPath(src.id), meta, m => m.status !== "preparing", wait);
+  meta = await waitFor(refPath(src.id), meta, m => m.status !== "preparing", wait);
+  // the job could not get the video (the source changed its protection): the moderator sends it
+  if (meta.status === "failed" && SOURCES[src.host].uploadFallback && !meta.notSent) {
+    meta = { ...meta, status: "upload", key: randomBytes(16).toString("hex"), requested: iso(now), reason: null };
+    await putJson(refPath(src.id), meta);
+  }
+  return meta;
 }
 
 const clip = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -474,11 +481,12 @@ export async function putRef(id, file, bytes) {
   return { ok: true };
 }
 /** Reference job finished: the video's size, duration and the times of each sheet's frames. */
-export async function finishRef(id, { ok, reason, duration, width, height, sheets }) {
+export async function finishRef(id, { ok, reason, duration, width, height, sheets, video }) {
   const m = await getJson(refPath(id));
   if (m?.status !== "preparing") return { ok: false, error: "No reference is being prepared." };
   if (ok && !(num(duration, 0.5, 600) && num(width, 16, 8192) && num(height, 16, 8192) && sheets && times(sheets.general, duration) && (sheets.inicio == null || times(sheets.inicio, duration)))) return { ok: false, error: "duration, width, height and sheets.general are required." };
-  const next = ok ? { ...m, status: "ready", duration, width, height, sheets: { general: sheets.general, ...(sheets.inicio ? { inicio: sheets.inicio } : {}) }, reason: null }
+  const found = typeof video === "string" && Object.values(SOURCES).some(x => x.video.test(video)) ? video : null;
+  const next = ok ? { ...m, status: "ready", duration, width, height, ...(found && !m.video ? { video: found } : {}), sheets: { general: sheets.general, ...(sheets.inicio ? { inicio: sheets.inicio } : {}) }, reason: null }
     : { ...m, status: "failed", reason: String(reason || "The video could not be read.").slice(0, 300) };
   await putJson(refPath(id), next);
   return { ok: true, status: next.status };

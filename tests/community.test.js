@@ -72,7 +72,7 @@ test("reference, comparison rounds, publication", async () => {
   assert.ok((await proposeTemplate({ ...A, url, compositions: unsigned, card }, { ...opts })).errors.some(e => e.code === "NO_SIGNATURE"));
   const r = await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...opts });
   assert.equal(r.accepted, true); assert.equal(r.status, "comparing"); assert.equal(r.round, 1);
-  assert.deepEqual(jobs.at(-1), { kind: "compare", id, variant: "horizontal", round: 1, video: "https://media.prompt-motion.com/x/video.b1.mp4", upload: 1 });
+  assert.deepEqual(jobs.at(-1), { kind: "compare", id, variant: "horizontal", round: 1, video: "https://media.prompt-motion.com/x/video.b1.mp4" });
   assert.equal((await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...opts })).duplicate, true);
   assert.equal((await brief({ ...A, url }, opts)).alreadyExists, true);
   assert.equal((await proposeTemplate({ ...A, url, code: r.code, compositions: compositions(), card }, opts)).errors[0].code, "COMPARING");
@@ -160,38 +160,44 @@ test("comparisons are limited and an abandoned proposal frees its video", async 
   const other = await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...opts, now: later });
   assert.equal(other.accepted, true); assert.notEqual(other.code, r.code);
 });
-test("a page that refuses this server: the moderator drops the video on the upload page", async () => {
+test("a page that refuses this server: the Studio job reads it; if it cannot, the moderator uploads the video", async () => {
   setStore(mem()); jobs.length = 0;
   const blocked = async () => ({ ok: false, status: 403, text: async () => "" });
   const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
   const o = { ...opts, fetcher: blocked };
   assert.match((await getRecreationBrief({ ...A, url, video: "https://evil.com/x.mp4" }, o)).error, /media\.prompt-motion\.com/);
-  // no video address: an upload page instead of guessing it
+  // no video address: the job gets the page and finds the video itself
   const first = await getRecreationBrief({ ...A, url, prompt: "a ball and rings", title: "Rings", author: "Kent", authorUrl: "javascript:alert(1)" }, o);
-  assert.equal(first.ok, true); assert.equal(first.reference.status, "upload"); assert.equal(first.upload.script, undefined);
-  assert.match(first.upload.page, /\/subir\/c-pm-parkerrex-1a54fe\/[0-9a-f]{32}$/); assert.match(first.message, /Save video as/);
-  assert.equal(first.prompt, "a ball and rings"); assert.equal(first.source.authorUrl, null); assert.equal(jobs.length, 0);
-  const key = first.upload.page.split("/").pop();
+  assert.equal(first.ok, true); assert.equal(first.reference.status, "preparing"); assert.equal(first.source.authorUrl, null);
+  assert.deepEqual(jobs.at(-1), { kind: "reference", id, page: url });
+  // the job could not download it: upload page, without guessing the address
+  await finishRef(id, { ok: false, reason: "media.prompt-motion.com respondió HTTP 403" });
+  const up = await getRecreationBrief({ ...A, url }, o);
+  assert.equal(up.reference.status, "upload"); assert.equal(up.upload.script, undefined);
+  assert.match(up.upload.page, /\/subir\/c-pm-parkerrex-1a54fe\/[0-9a-f]{32}$/); assert.match(up.message, /Save video as/);
+  const key = up.upload.page.split("/").pop();
   assert.equal((await putUpload(id, key, 0, MP4)).ok, true);
   assert.equal((await finishUpload(id, key, 1, o)).ok, true);
   assert.deepEqual(jobs.at(-1), { kind: "reference", id, video: null, upload: 1 });
-  await referenceReady(id);
-  assert.equal((await getRecreationBrief({ ...A, url }, o)).reference.status, "ready", "once extracted, the video is not needed again");
+  // the job reports the address it found: comparisons use it
+  assert.equal((await putRef(id, "general.jpg", JPG)).ok, true);
+  assert.equal((await finishRef(id, { ok: true, duration: 20, width: 1920, height: 1080, sheets: { general: [1, 5, 10] }, video: "https://media.prompt-motion.com/x/v.mp4" })).ok, true);
+  assert.equal((await getRecreationBrief({ ...A, url }, o)).reference.status, "ready");
   const r = await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...o });
-  assert.deepEqual([jobs.at(-1).kind, jobs.at(-1).video, jobs.at(-1).upload], ["compare", null, 1]);
+  assert.deepEqual([jobs.at(-1).kind, jobs.at(-1).video, jobs.at(-1).upload], ["compare", "https://media.prompt-motion.com/x/v.mp4", 1]);
   await compared(id, 1);
   await publishTemplate({ ...A, code: r.code, notes: "Nada" }, { ...o, fetcher: studio });
   assert.equal((await readRecord(id)).source.author, "Kent");
-  // a source the server can download still needs its address
+  // a source without a readable page still needs its address
   const os = await getRecreationBrief({ ...A, url: "https://oneshotted.io/v/one-shape-loop" }, o);
   assert.equal(os.ok, false); assert.equal(os.needsPage, true);
 });
-test("a job that cannot read the video fails the brief", async () => {
+test("a job that cannot read the video fails the brief (sources without an upload fallback)", async () => {
   setStore(mem());
-  const id = "c-pm-parkerrex-1a54fe";
-  await brief({ ...A, url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
+  const url = "https://oneshotted.io/v/one-shape-loop", id = "c-os-one-shape-loop", o = { ...opts, fetcher: async () => ({ ok: false, status: 403, text: async () => "" }) };
+  await getRecreationBrief({ ...A, url, video: "https://r2.oneshotted.io/a/b.mp4" }, o);
   await finishRef(id, { ok: false, reason: "el video respondió 403" });
-  const b = await brief({ ...A, url: "https://prompt-motion.com/parkerrex-1a54fe" }, opts);
+  const b = await getRecreationBrief({ ...A, url }, o);
   assert.equal(b.ok, false); assert.match(b.error, /403.*compared/);
 });
 test("daily limit per caller", async () => {
@@ -213,11 +219,13 @@ test("render callbacks need the render secret", async () => {
   assert.equal(await call({}, { op: "finish" }), 401);
   assert.equal(await call({ authorization: "Bearer s3cret" }, { op: "finish" }), 400);
 });
-test("prompt-motion's video is sent by the caller's Claude in parts", async () => {
+test("when the job cannot download prompt-motion's video, the caller sends it in parts", async () => {
   setStore(mem()); jobs.length = 0;
   const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  await getRecreationBrief({ ...A, url }, opts);
+  await finishRef(id, { ok: false, reason: "HTTP 403" });
   const b = await getRecreationBrief({ ...A, url }, opts);
-  assert.equal(b.ok, true); assert.equal(b.reference.status, "upload"); assert.equal(jobs.length, 0);
+  assert.equal(b.ok, true); assert.equal(b.reference.status, "upload"); assert.equal(jobs.length, 1);
   assert.match(b.upload.script, /curl -sfL "https:\/\/media\.prompt-motion\.com\/x\/video\.b1\.mp4"/);
   const key = new URL(b.upload.done).searchParams.get("key");
   assert.equal((await getRecreationBrief({ ...A, url }, opts)).upload.done, b.upload.done, "the same upload until it ends");
