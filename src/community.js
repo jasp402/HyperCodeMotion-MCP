@@ -1,14 +1,18 @@
 /**
- * Community templates: a user gives Claude the link of a public motion video, Claude recreates it in the
- * user's own conversation and sends the result here. Nothing waits for a person, but nothing is published
- * without being compared with the original:
+ * Official gallery templates made from public motion videos. A HyperCodeMotion moderator gives Claude the
+ * link of a video and their moderator code; Claude recreates it in the moderator's own conversation and sends
+ * the result here. Only moderator codes are accepted, and nothing is published without being compared with
+ * the original:
  *   1. get_recreation_brief: the Studio repo's GitHub Action downloads the video and extracts reference
  *      frames, which Claude sees before building anything.
  *   2. propose_template: the same Action renders the recreation with the real Studio engine and builds a
  *      side-by-side sheet and comparacion.mp4 (original | recreation). Claude fixes what differs and sends
  *      it again with the same code, up to MAX_ROUNDS comparisons.
- *   3. publish_template: once Claude judges the comparison faithful, the gallery media are rendered and the
- *      template is published marked «Community». The owner can retire any of them afterwards.
+ *   3. publish_template: once Claude judges the comparison faithful, the Studio repo's workflow renders the
+ *      gallery media, commits the template to the Studio code (its own files only: plantillas/<slug>…,
+ *      bienvenida/ejemplos/<slug>…) on a branch plantilla/<slug> and opens a pull request against
+ *      TEMPLATE_BRANCH. Each template is its own PR with its own preview, so a moderator approves or
+ *      discards it without touching the others.
  *
  * Blob layout (private store, served by api/community.js):
  *   community/refs/<id>/meta.json        reference of the source video (status, duration, size, frame times)
@@ -19,14 +23,17 @@
  *   community/codes/<code>.json          tracking code → template id
  *   community/templates/<id>/<variant>.json   the three compositions
  *   community/media/<id>/<id>-<ratio>.<mp4|jpg>   preview media uploaded by the render job
- *   community/index.json                 published templates, read by the gallery
- *   community/limits/<day>.json          proposals per caller per day
+ *   community/index.json                 Community templates published before official ones replaced them
+ *   community/limits/<day>.json          proposals per moderator per day
+ *
+ * Moderator codes: TEMPLATE_ADMIN_CODES (or COMMUNITY_ADMIN_SECRET) holds one code or a list
+ * "name:code, name:code"; the name is recorded with each template.
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { validateJson } from "./contract.js";
 import { checkComposition } from "./hcmotion.js";
 import { BRIEF, FORMATS, GROUPS } from "./brief.js";
-import { PUBLIC_URL } from "./files.js";
+import { PUBLIC_URL, STUDIO_URL } from "./files.js";
 
 export const SOURCES = {
   "prompt-motion.com": { name: "Prompt Motion", path: /^\/([a-z0-9][a-z0-9_-]{2,80})\/?$/, prefix: "pm", videoHost: "media.prompt-motion.com", video: /^https:\/\/media\.prompt-motion\.com\/[^\s"']+\.mp4$/,
@@ -34,8 +41,10 @@ export const SOURCES = {
     callerSends: true },
   "oneshotted.io": { name: "Oneshotted", path: /^\/v\/([a-z0-9][a-z0-9-]{2,120})\/?$/, prefix: "os", videoHost: "r2.oneshotted.io", video: /^https:\/\/r2\.oneshotted\.io\/[^\s"']+\.mp4$/ }
 };
-export const MAX_PER_DAY = 5;
+export const MAX_PER_DAY = 20;
 export const MAX_GLOBAL_PER_DAY = 100;
+/** Branch of the Studio repo that receives published templates. */
+export const TEMPLATE_BRANCH = () => process.env.TEMPLATE_BRANCH || "template";
 /** Comparisons a proposal may use before it has to be published or dropped. */
 export const MAX_ROUNDS = 3;
 const MAX_SUBMISSIONS = MAX_ROUNDS * 2;
@@ -51,6 +60,23 @@ const MAX_DURATION = 45;
 const MAX_COMPOSITION_BYTES = 1.2 * 1024 * 1024;
 const RATIOS = ["1-1", "3-4", "4-3", "9-16", "16-9"];
 export const MEDIA_FILES = RATIOS.flatMap(r => [`${r}.mp4`, `${r}.jpg`]);
+
+const equalText = (a, b) => typeof a === "string" && typeof b === "string" && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+/** Moderators allowed to publish: one code, or a list "name:code" separated by commas, semicolons or lines. */
+export function moderators(env = process.env.TEMPLATE_ADMIN_CODES || process.env.COMMUNITY_ADMIN_SECRET || "") {
+  return String(env).split(/[,;\n]/).map(x => x.trim()).filter(Boolean)
+    .map((x, i) => { const k = x.lastIndexOf(":"); return k > 0 ? { name: x.slice(0, k).trim(), code: x.slice(k + 1).trim() } : { name: i ? `moderador ${i + 1}` : "admin", code: x }; })
+    .filter(m => m.name && m.code.length >= 6);
+}
+/** Name of the moderator a code belongs to, or null. */
+export function moderatorOf(code) {
+  const c = typeof code === "string" ? code.trim() : "";
+  if (!c) return null;
+  let who = null;
+  for (const m of moderators()) if (equalText(m.code, c)) who = m.name;
+  return who;
+}
+const NEEDS_CODE = "Only HyperCodeMotion moderators can turn a video into a gallery template. Ask the user for their moderator code (it is never shown back) and call again with url and adminCode.";
 
 let blob = null;
 /** @vercel/blob, loaded only when needed (tests inject their own store). */
@@ -134,7 +160,7 @@ const jpg = async path => { const b = await (await store()).get(path); return b 
 /** The composition whose format is closest to the original's: the one that must look most like it. */
 export const closestVariant = (w, h) => (w / h > 1.2 ? "horizontal" : w / h < 0.8 ? "vertical" : "cuadrado");
 
-const publicRecord = r => r && { template: r.id, code: r.code, status: r.status, reason: r.reason ?? null, name: r.card?.name ?? null, source: r.source.url, published: r.status === "published" };
+const publicRecord = r => r && { template: r.official?.slug ?? r.id, code: r.code, status: r.status, reason: r.reason ?? null, name: r.card?.name ?? null, source: r.source.url, published: r.status === "published", ...(r.official ? { official: { slug: r.official.slug, branch: r.official.branch, commit: r.official.commit ?? null, pr: r.official.pr ?? null } } : {}) };
 const live = (r, now) => ["comparing", "review"].includes(r.status) && now - Date.parse(r.updated || r.created) < STALE_MS;
 /** A record that keeps its video from being proposed again by someone else. */
 const holds = (r, now) => r && r.status !== "failed" && (!["comparing", "review"].includes(r.status) || live(r, now));
@@ -176,8 +202,9 @@ function fromCaller(args, src) {
 export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dispatchJob, now = Date.now(), wait = WAIT_MS } = {}) {
   const src = parseSource(args.url);
   if (src.error) return { ok: false, error: src.error };
+  if (!moderatorOf(args.adminCode)) return { ok: false, needsCode: true, error: NEEDS_CODE };
   const existing = await getJson(`community/records/${src.id}.json`);
-  if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a Community template (or one is being made from it). Do not recreate it: give the user this status." };
+  if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a gallery template (or one is being made from it). Do not recreate it: give the user this status." };
   const given = fromCaller(args, src);
   if (given.badVideo) return { ok: false, template: src.id, error: `video must be the address of the page's own video file (an .mp4 on ${SOURCES[src.host].videoHost}).` };
   // the source sites often refuse this server (bot checks): what the caller read on the page fills the gaps
@@ -199,7 +226,7 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
       ...out, reference: { status: "upload" },
       upload: { video: ref.video, partBytes: PART_BYTES, maxParts: MAX_PARTS, part: `${send}&op=upload&part=<n>`, done: `${send}&op=upload-done&parts=<count>`,
         script: `set -e; curl -sfL "${ref.video}" -o original.mp4; split -b ${PART_BYTES} -d -a 2 original.mp4 part.; n=0; for f in part.*; do curl -sf -H "content-type: application/octet-stream" --data-binary @"$f" "${send}&op=upload&part=$n" >/dev/null; n=$((n+1)); done; curl -sf -X POST "${send}&op=upload-done&parts=$n"` },
-      message: `${src.site} does not let servers download its videos, so you send it: run upload.script in your code or shell tool (it downloads the video and sends it here in parts; it needs network access to ${SOURCES[src.host].videoHost} and ${new URL(PUBLIC_URL).host}). Then call get_recreation_brief again with the same url. If you have no tool that can run it, tell the user this video cannot be recreated from here.`
+      message: `${src.site} does not let servers download its videos, so you send it: run upload.script in your code or shell tool (it downloads the video and sends it here in parts; it needs network access to ${SOURCES[src.host].videoHost} and ${new URL(PUBLIC_URL).host}). Then call get_recreation_brief again with the same url. If your shell cannot reach those hosts, use a browser tool instead: open upload.video in it and, on that page, fetch it (same origin) and POST each part of up to partBytes bytes to upload.part with no content-type, then POST upload.done. If you have neither, tell the user this video cannot be recreated from here.`
     };
   }
   if (ref.status !== "ready") return { ...out, reference: { status: "preparing" }, message: "The original video is being downloaded and its reference frames extracted (usually one or two minutes). Read the prompt meanwhile, then call get_recreation_brief again with the same url. Do not build anything before you have seen the frames." };
@@ -266,10 +293,12 @@ const normCode = c => String(c ?? "").trim().toLowerCase();
 const CODE = /^[0-9a-z]{6,12}[0-9a-f]{8}$/;
 
 /** propose_template: a first proposal, or a revision of one (same code) after its comparison. */
-export async function proposeTemplate(args, { caller, now = Date.now(), dispatch = dispatchJob, fetcher = fetch } = {}) {
+export async function proposeTemplate(args, { now = Date.now(), dispatch = dispatchJob, fetcher = fetch } = {}) {
   const src = parseSource(args.url);
   if (src.error) return { accepted: false, errors: [{ path: "$.url", code: "SOURCE_NOT_ACCEPTED", message: src.error }] };
   const fail = (code, message, path = "$") => ({ accepted: false, errors: [{ path, code, message }] });
+  const by = moderatorOf(args.adminCode);
+  if (!by) return fail("MODERATOR_CODE", NEEDS_CODE, "$.adminCode");
   const existing = await getJson(`community/records/${src.id}.json`);
   const code = args.code == null ? "" : normCode(args.code);
   const revision = !!code && existing?.code === code;
@@ -278,7 +307,7 @@ export async function proposeTemplate(args, { caller, now = Date.now(), dispatch
     if (existing.status === "comparing") return fail("COMPARING", "Its comparison is still being rendered: call get_proposal_status with the code first.", "$.code");
     if (existing.status !== "review") return { ...fail("NOT_REVISABLE", `This proposal is ${existing.status}; it can no longer be changed.`, "$.code"), ...publicRecord(existing) };
     if (existing.compare.done >= MAX_ROUNDS || existing.compare.round >= MAX_SUBMISSIONS) return fail("ROUNDS_USED", `It already used its ${MAX_ROUNDS} comparisons: publish it with publish_template if it is faithful, or stop here.`, "$.code");
-  } else if (holds(existing, now)) return { accepted: false, duplicate: true, ...publicRecord(existing), errors: [{ path: "$.url", code: "ALREADY_EXISTS", message: "This video is already a Community template (or one is being made from it); give the user this status." }] };
+  } else if (holds(existing, now)) return { accepted: false, duplicate: true, ...publicRecord(existing), errors: [{ path: "$.url", code: "ALREADY_EXISTS", message: "This video is already a gallery template (or one is being made from it); give the user this status." }] };
   const ref = await getJson(refPath(src.id));
   if (ref?.status !== "ready") return fail("REFERENCE_NOT_READY", "Call get_recreation_brief with this url first and build from its reference frames.", "$.url");
 
@@ -290,8 +319,8 @@ export async function proposeTemplate(args, { caller, now = Date.now(), dispatch
   if (!revision) {
     const limitsPath = `community/limits/${day(now)}.json`;
     const limits = (await getJson(limitsPath)) || { total: 0, by: {} };
-    const who = callerKey(caller);
-    if ((limits.by[who] || 0) >= MAX_PER_DAY) return fail("DAILY_LIMIT", `At most ${MAX_PER_DAY} proposals a day from the same place. Try again tomorrow.`);
+    const who = callerKey(by);
+    if ((limits.by[who] || 0) >= MAX_PER_DAY) return fail("DAILY_LIMIT", `At most ${MAX_PER_DAY} proposals a day per moderator. Try again tomorrow.`);
     if (limits.total >= MAX_GLOBAL_PER_DAY) return fail("DAILY_LIMIT", "The gallery took all the proposals it can render today. Try again tomorrow.");
     limits.total++; limits.by[who] = (limits.by[who] || 0) + 1;
     await putJson(limitsPath, limits);
@@ -304,7 +333,7 @@ export async function proposeTemplate(args, { caller, now = Date.now(), dispatch
     id: src.id, code: revision ? existing.code : `${now.toString(36)}${randomBytes(4).toString("hex")}`, status: "comparing",
     created: revision ? existing.created : iso(now), updated: iso(now),
     source: revision ? existing.source : { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title ?? ref.info?.title ?? null, author: page.author ?? ref.info?.author ?? null, authorUrl: page.authorUrl ?? ref.info?.authorUrl ?? null },
-    card, variant, reason: null,
+    card, variant, reason: null, by: revision ? existing.by ?? by : by,
     compare: { round: revision ? existing.compare.round + 1 : 1, done: revision ? existing.compare.done : 0, ok: null, reason: null, times: null }
   };
   for (const f of FORMATS) {
@@ -330,7 +359,7 @@ export async function getProposalStatus(args, { wait = WAIT_MS } = {}) {
   let r = path && await getJson(path);
   if (!r || r.code !== code) return { found: false, error: "No proposal with that code." };
   r = await waitFor(path, r, x => x.status !== "comparing", wait);
-  const out = { found: true, ...publicRecord(r), studio: r.status === "published" ? "https://app.hypercodemotion.com (Explorar animaciones, card marked «Community»)" : null };
+  const out = { found: true, ...publicRecord(r), studio: r.status === "published" ? (r.official ? (r.official.pr ? `Pull request ${r.official.pr}: its preview shows the template in the gallery (Explorar animaciones: «${r.card?.name}»); merging it adds it to ${r.official.branch}.` : `Committed to ${r.official.branch}.`) : `${STUDIO_URL} (Explorar animaciones, card marked «Community»)`) : null };
   if (r.status === "comparing") return { ...out, message: "Its comparison is still being rendered: call get_proposal_status again." };
   if (r.status !== "review") return out;
   const left = Math.max(0, Math.min(MAX_ROUNDS - r.compare.done, MAX_SUBMISSIONS - r.compare.round));
@@ -344,9 +373,23 @@ export async function getProposalStatus(args, { wait = WAIT_MS } = {}) {
   };
 }
 
-/** publish_template: the comparison is faithful, so the gallery media are rendered and it is published. */
-export async function publishTemplate(args, { now = Date.now(), dispatch = dispatchJob } = {}) {
+/** Gallery id of an official template, from its card name: "Cubo de fichas" → "cubo-de-fichas". */
+export const slugOf = name => String(name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/g, "") || "plantilla";
+/** A slug no Studio template uses yet (official templates are files of the Studio: plantillas/<slug>-<variant>.json). */
+export async function freeSlug(name, sourceSlug, fetcher = fetch, id = null) {
+  const base = slugOf(name);
+  // a slug held by another template's open pull request counts as taken too
+  const held = async slug => { const c = await getJson(`community/slugs/${slug}.json`); return !!c && c.id !== id; };
+  const taken = async slug => { if (await held(slug)) return true; try { const r = await fetcher(`${STUDIO_URL}/plantillas/${slug}-vertical.json`, { method: "HEAD", signal: AbortSignal.timeout(8000) }); return r.ok && !/text\/html/.test(r.headers?.get?.("content-type") || ""); } catch { return false; } };
+  for (const slug of [base, `${base}-${String(sourceSlug).replace(/[^a-z0-9]/g, "").slice(-6)}`]) if (!(await taken(slug))) return slug;
+  return `${base}-${randomBytes(3).toString("hex")}`;
+}
+
+/** publish_template: the comparison is faithful, so the Studio workflow renders its media and commits it to the Studio code. */
+export async function publishTemplate(args, { now = Date.now(), dispatch = dispatchJob, fetcher = fetch } = {}) {
   const code = normCode(args.code), notes = typeof args.notes === "string" ? args.notes.trim() : "";
+  const by = moderatorOf(args.adminCode);
+  if (!by) return { accepted: false, error: NEEDS_CODE };
   if (!CODE.test(code)) return { accepted: false, error: "code must be the tracking code propose_template returned." };
   if (!notes || notes.length > 600) return { accepted: false, error: "notes is required: in up to 600 characters, what is consciously different from the original and why (or that nothing is)." };
   const ref = await getJson(`community/codes/${code}.json`);
@@ -354,10 +397,18 @@ export async function publishTemplate(args, { now = Date.now(), dispatch = dispa
   const r = path && await getJson(path);
   if (!r || r.code !== code) return { accepted: false, error: "No proposal with that code." };
   if (r.status !== "review" || !r.compare?.ok) return { accepted: false, ...publicRecord(r), error: r.status === "comparing" ? "Its comparison is still being rendered: look at it with get_proposal_status first." : r.status === "review" ? "Its last comparison failed: fix it and send it again with propose_template first." : `This proposal is ${r.status}.` };
-  Object.assign(r, { status: "rendering", notes, updated: iso(now) });
+  const slug = r.official?.slug ?? await freeSlug(r.card.name, r.source.id, fetcher, r.id);
+  await putJson(`community/slugs/${slug}.json`, { id: r.id });
+  const branch = TEMPLATE_BRANCH();
+  Object.assign(r, { status: "rendering", notes, updated: iso(now), official: { slug, branch, by } });
   await putJson(path, r);
-  const sent = await dispatch("render", r.id).catch(() => false);
-  return { accepted: true, ...publicRecord(r), message: sent ? "Its gallery videos are being rendered; then it appears in the Studio gallery marked «Community». get_proposal_status tells when." : "It appears in the Studio gallery marked «Community» as soon as its gallery videos are rendered." };
+  const sent = await dispatch("official", r.id, { slug, branch }).catch(() => false);
+  if (!sent) {
+    Object.assign(r, { status: "review", official: undefined, updated: iso(now) });
+    await putJson(path, r);
+    return { accepted: false, ...publicRecord(r), error: "The publishing job could not be started right now; call publish_template again later with the same code." };
+  }
+  return { accepted: true, ...publicRecord(r), message: `Publishing as the official template «${r.card.name}» (${slug}): its gallery videos are rendered (a few minutes) and a pull request is opened against ${branch} with its own preview. Call get_proposal_status with the code until it is published: it gives the pull request link, where the moderator approves or discards it.` };
 }
 
 /** Starts a job of the Studio repo's community workflow (reference, compare or render). Needs GITHUB_DISPATCH_TOKEN. */
@@ -469,15 +520,25 @@ export async function putMedia(id, file, bytes) {
 }
 
 /** Render job finished (ok) or failed (reason): publish it or tell the user why not. */
-export async function finishRender(id, { ok, reason }, now = Date.now()) {
+export async function finishRender(id, { ok, reason, commit, pr }, now = Date.now()) {
   const r = await getJson(`community/records/${id}.json`);
   if (!r) return { ok: false, error: "Unknown template." };
   if (r.status !== "rendering") return { ok: false, error: `Not rendering (${r.status}).` };
   if (ok) Object.assign(r, { status: "published", published: new Date(now).toISOString(), reason: null });
-  else Object.assign(r, { status: "failed", reason: String(reason || "The preview could not be rendered.").slice(0, 300) });
+  else Object.assign(r, { status: r.official ? "review" : "failed", reason: String(reason || "The preview could not be rendered.").slice(0, 300) });
+  if (r.official && ok && typeof commit === "string" && /^[0-9a-f]{7,40}$/.test(commit)) r.official.commit = commit;
+  if (r.official && ok && typeof pr === "string" && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(pr)) r.official.pr = pr;
   await putJson(`community/records/${id}.json`, r);
-  await updateIndex(r);
+  // official templates live in the Studio code; the Community index only keeps the ones published before
+  if (!r.official) await updateIndex(r);
   return { ok: true, status: r.status };
+}
+
+/** The publishing job: what it writes into the Studio code (card, source, notes, slug). */
+export async function readRecord(id) {
+  if (!/^c-[a-z0-9-]{3,62}$/.test(id)) return null;
+  const r = await getJson(`community/records/${id}.json`);
+  return r && r.official ? { id: r.id, card: r.card, source: r.source, notes: r.notes ?? "", official: r.official } : null;
 }
 
 /** Owner: takes a template out of the gallery (its record stays, so the same video is not proposed again). */
