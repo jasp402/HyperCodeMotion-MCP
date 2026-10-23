@@ -1,8 +1,11 @@
+import { verifyActions } from "../src/oidc.js";
 import { finishCompare, finishRef, finishRender, finishUpload, moderatorOf, putCompare, putMedia, putRef, putUpload, readCompare, readIndex, readMedia, readRecord, readTemplateWithStatus, readUpload, retire } from "../src/community.js";
 
 const MAX = 4 * 1024 * 1024;
 const json = (res, status, payload, cache = "no-store") => { res.statusCode = status; res.setHeader("Content-Type", "application/json"); res.setHeader("Cache-Control", cache); res.end(JSON.stringify(payload)); };
 const bearer = (req, secret) => !!secret && req.headers?.authorization === `Bearer ${secret}`;
+/** The Studio repo's render workflow: its GitHub OIDC token (or, while it is still set, COMMUNITY_RENDER_SECRET). */
+const renderJob = async req => bearer(req, process.env.COMMUNITY_RENDER_SECRET) || !!(await verifyActions(String(req.headers?.authorization || "").replace(/^Bearer /, "")));
 /** A moderator code as the bearer token (TEMPLATE_ADMIN_CODES or COMMUNITY_ADMIN_SECRET). */
 const moderator = req => !!moderatorOf(String(req.headers?.authorization || "").replace(/^Bearer /, ""));
 async function body(req) {
@@ -19,16 +22,16 @@ async function body(req) {
  *   GET  /c/<id>/<variant>.json      a template's composition (cuadrado, vertical, horizontal)
  *   GET  /c/<id>/<id>-<ratio>.<ext>  its preview media
  *   GET  /api/community?op=compare&id=&file=  latest comparison, sheet.jpg or comparacion.mp4 (a moderator code)
- *   GET  /api/community?op=record&id=         what the publishing job commits: card, source, notes, slug (COMMUNITY_RENDER_SECRET)
- *   GET  /api/community?op=part&id=&part=      a part of an original the caller sent (COMMUNITY_RENDER_SECRET)
+ *   GET  /api/community?op=record&id=         what the publishing job commits: card, source, notes, slug (the render workflow: GitHub OIDC)
+ *   GET  /api/community?op=part&id=&part=      a part of an original the caller sent (the render workflow: GitHub OIDC)
  *   POST /api/community?op=upload&id=&key=&part=   the caller's Claude sends one part of the original (key from the brief)
  *   POST /api/community?op=upload-done&id=&key=&parts=   all parts sent: starts the reference job
- *   POST /api/community?op=ref&id=&file=     reference job uploads one frame sheet (COMMUNITY_RENDER_SECRET)
- *   POST /api/community?op=ref-done          {id, ok, reason, duration, width, height, sheets} (COMMUNITY_RENDER_SECRET)
- *   POST /api/community?op=compare&id=&file= compare job uploads sheet.jpg or comparacion.mp4 (COMMUNITY_RENDER_SECRET)
- *   POST /api/community?op=compared          {id, round, ok, reason, times} (COMMUNITY_RENDER_SECRET)
- *   POST /api/community?op=media&id=&file=   render job uploads one preview file (COMMUNITY_RENDER_SECRET)
- *   POST /api/community?op=finish    {id, ok, reason, commit} render or publishing job is done (COMMUNITY_RENDER_SECRET)
+ *   POST /api/community?op=ref&id=&file=     reference job uploads one frame sheet (the render workflow: GitHub OIDC)
+ *   POST /api/community?op=ref-done          {id, ok, reason, duration, width, height, sheets} (the render workflow: GitHub OIDC)
+ *   POST /api/community?op=compare&id=&file= compare job uploads sheet.jpg or comparacion.mp4 (the render workflow: GitHub OIDC)
+ *   POST /api/community?op=compared          {id, round, ok, reason, times} (the render workflow: GitHub OIDC)
+ *   POST /api/community?op=media&id=&file=   render job uploads one preview file (the render workflow: GitHub OIDC)
+ *   POST /api/community?op=finish    {id, ok, reason, commit} render or publishing job is done (the render workflow: GitHub OIDC)
  *   POST /api/community?op=retire    {id, reason} a moderator takes a Community one out of the gallery (a moderator code)
  */
 export default async function handler(req, res) {
@@ -39,7 +42,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
   if (req.method === "GET" || req.method === "HEAD") {
     if (op === "part") {
-      if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
+      if (!(await renderJob(req))) return json(res, 401, { error: "Unauthorized" });
       const bytes = await readUpload(String(id), q("part"));
       if (!bytes) { res.statusCode = 404; return res.end("Not found."); }
       res.statusCode = 200;
@@ -48,7 +51,7 @@ export default async function handler(req, res) {
       return res.end(Buffer.from(bytes));
     }
     if (op === "record") {
-      if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
+      if (!(await renderJob(req))) return json(res, 401, { error: "Unauthorized" });
       const r = await readRecord(String(id));
       return r ? json(res, 200, r) : json(res, 404, { error: "No template being published with that id." });
     }
@@ -89,7 +92,7 @@ export default async function handler(req, res) {
   }
   const uploads = { media: putMedia, ref: putRef, compare: putCompare };
   if (uploads[op]) {
-    if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
+    if (!(await renderJob(req))) return json(res, 401, { error: "Unauthorized" });
     const bytes = Buffer.isBuffer(data) ? data : null;
     if (!bytes?.length) return json(res, 400, { error: "Send the file as the request body." });
     const r = await uploads[op](String(id), String(file), bytes);
@@ -97,12 +100,12 @@ export default async function handler(req, res) {
   }
   if (Buffer.isBuffer(data)) { try { data = JSON.parse(data.toString() || "{}"); } catch { return json(res, 400, { error: "Body must be JSON." }); } }
   if (op === "finish") {
-    if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
-    const r = await finishRender(String(data.id), { ok: data.ok === true, reason: data.reason, commit: data.commit });
+    if (!(await renderJob(req))) return json(res, 401, { error: "Unauthorized" });
+    const r = await finishRender(String(data.id), { ok: data.ok === true, reason: data.reason, commit: data.commit, pr: data.pr });
     return json(res, r.ok ? 200 : 400, r);
   }
   if (op === "ref-done" || op === "compared") {
-    if (!bearer(req, process.env.COMMUNITY_RENDER_SECRET)) return json(res, 401, { error: "Unauthorized" });
+    if (!(await renderJob(req))) return json(res, 401, { error: "Unauthorized" });
     const r = op === "ref-done"
       ? await finishRef(String(data.id), { ok: data.ok === true, reason: data.reason, duration: data.duration, width: data.width, height: data.height, sheets: data.sheets })
       : await finishCompare(String(data.id), { round: data.round, ok: data.ok === true, reason: data.reason, times: data.times });

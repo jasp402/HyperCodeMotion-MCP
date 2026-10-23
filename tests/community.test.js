@@ -98,13 +98,13 @@ test("reference, comparison rounds, publication", async () => {
   const p = await publishTemplate({ adminCode: "codigo-ana-22", code: r.code, notes: "Fondo sin grano: el motor no lo hace." }, opts);
   assert.equal(p.accepted, true); assert.equal(p.status, "rendering");
   assert.deepEqual(jobs.at(-1), { kind: "official", id, slug: "cubo-de-fichas", branch: "template" });
-  assert.deepEqual(p.official, { slug: "cubo-de-fichas", branch: "template", commit: null });
+  assert.deepEqual(p.official, { slug: "cubo-de-fichas", branch: "template", commit: null, pr: null });
   const rec = await readRecord(id);
   assert.equal(rec.card.name, "Cubo de fichas"); assert.equal(rec.source.author, "Parker Rex"); assert.equal(rec.official.by, "ana"); assert.equal(rec.notes, "Fondo sin grano: el motor no lo hace.");
-  assert.equal((await finishRender(id, { ok: true, commit: "abc1234" })).status, "published");
+  assert.equal((await finishRender(id, { ok: true, commit: "abc1234", pr: "https://github.com/jasp402/HyperCodeMotion/pull/41" })).status, "published");
   assert.deepEqual(await readIndex(), [], "official templates do not go to the Community index");
   const done = await getProposalStatus({ code: r.code }, { wait: 0 });
-  assert.equal(done.published, true); assert.equal(done.template, "cubo-de-fichas"); assert.equal(done.official.commit, "abc1234"); assert.match(done.studio, /template/);
+  assert.equal(done.published, true); assert.equal(done.template, "cubo-de-fichas"); assert.equal(done.official.commit, "abc1234"); assert.equal(done.official.pr, "https://github.com/jasp402/HyperCodeMotion/pull/41"); assert.match(done.studio, /pull\/41/);
   assert.equal((await proposeTemplate({ ...A, url, code: r.code, compositions: compositions(), card }, opts)).errors[0].code, "NOT_REVISABLE");
   assert.equal((await brief({ ...A, url }, opts)).alreadyExists, true, "a published video is not recreated again");
 });
@@ -126,6 +126,16 @@ test("moderator codes", async () => {
   const taken = async (u, o) => (o?.method === "HEAD" ? { ok: /cubo-de-fichas-vertical/.test(u), status: 200, headers: new Map([["content-type", "application/json"]]) } : page());
   const p = await publishTemplate({ ...A, code: r.code, notes: "Nada" }, { ...opts, fetcher: taken });
   assert.equal(p.official.slug, "cubo-de-fichas-1a54fe");
+  // a slug held by another template's open pull request is not reused
+  setStore(mem()); jobs.length = 0;
+  for (const [u, cid] of [["https://prompt-motion.com/parkerrex-1a54fe", "c-pm-parkerrex-1a54fe"], ["https://prompt-motion.com/otro-777777", "c-pm-otro-777777"]]) {
+    await brief({ ...A, url: u }, opts); await referenceReady(cid);
+    const rr = await proposeTemplate({ ...A, url: u, compositions: compositions(), card }, opts);
+    await compared(cid, 1);
+    const free = async (x, o) => (o?.method === "HEAD" ? { ok: false, status: 404, headers: new Map() } : page());
+    jobs.push((await publishTemplate({ ...A, code: rr.code, notes: "Nada" }, { ...opts, fetcher: free })).official.slug);
+  }
+  assert.deepEqual(jobs.filter(j => typeof j === "string"), ["cubo-de-fichas", "cubo-de-fichas-777777"]);
   // a job that cannot start leaves it in review, to publish again
   setStore(mem());
   await brief({ ...A, url }, opts); await referenceReady("c-pm-parkerrex-1a54fe");

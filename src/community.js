@@ -9,8 +9,10 @@
  *      side-by-side sheet and comparacion.mp4 (original | recreation). Claude fixes what differs and sends
  *      it again with the same code, up to MAX_ROUNDS comparisons.
  *   3. publish_template: once Claude judges the comparison faithful, the Studio repo's workflow renders the
- *      gallery media and commits the template to the Studio code (plantillas/, ejemplos/ and the gallery
- *      list) on TEMPLATE_BRANCH, so it is permanent and ships with the next deploy of that branch.
+ *      gallery media, commits the template to the Studio code (its own files only: plantillas/<slug>…,
+ *      bienvenida/ejemplos/<slug>…) on a branch plantilla/<slug> and opens a pull request against
+ *      TEMPLATE_BRANCH. Each template is its own PR with its own preview, so a moderator approves or
+ *      discards it without touching the others.
  *
  * Blob layout (private store, served by api/community.js):
  *   community/refs/<id>/meta.json        reference of the source video (status, duration, size, frame times)
@@ -158,7 +160,7 @@ const jpg = async path => { const b = await (await store()).get(path); return b 
 /** The composition whose format is closest to the original's: the one that must look most like it. */
 export const closestVariant = (w, h) => (w / h > 1.2 ? "horizontal" : w / h < 0.8 ? "vertical" : "cuadrado");
 
-const publicRecord = r => r && { template: r.official?.slug ?? r.id, code: r.code, status: r.status, reason: r.reason ?? null, name: r.card?.name ?? null, source: r.source.url, published: r.status === "published", ...(r.official ? { official: { slug: r.official.slug, branch: r.official.branch, commit: r.official.commit ?? null } } : {}) };
+const publicRecord = r => r && { template: r.official?.slug ?? r.id, code: r.code, status: r.status, reason: r.reason ?? null, name: r.card?.name ?? null, source: r.source.url, published: r.status === "published", ...(r.official ? { official: { slug: r.official.slug, branch: r.official.branch, commit: r.official.commit ?? null, pr: r.official.pr ?? null } } : {}) };
 const live = (r, now) => ["comparing", "review"].includes(r.status) && now - Date.parse(r.updated || r.created) < STALE_MS;
 /** A record that keeps its video from being proposed again by someone else. */
 const holds = (r, now) => r && r.status !== "failed" && (!["comparing", "review"].includes(r.status) || live(r, now));
@@ -357,7 +359,7 @@ export async function getProposalStatus(args, { wait = WAIT_MS } = {}) {
   let r = path && await getJson(path);
   if (!r || r.code !== code) return { found: false, error: "No proposal with that code." };
   r = await waitFor(path, r, x => x.status !== "comparing", wait);
-  const out = { found: true, ...publicRecord(r), studio: r.status === "published" ? (r.official ? `${STUDIO_URL} (Explorar animaciones: «${r.card?.name}»), once branch ${r.official.branch} is deployed` : `${STUDIO_URL} (Explorar animaciones, card marked «Community»)`) : null };
+  const out = { found: true, ...publicRecord(r), studio: r.status === "published" ? (r.official ? (r.official.pr ? `Pull request ${r.official.pr}: its preview shows the template in the gallery (Explorar animaciones: «${r.card?.name}»); merging it adds it to ${r.official.branch}.` : `Committed to ${r.official.branch}.`) : `${STUDIO_URL} (Explorar animaciones, card marked «Community»)`) : null };
   if (r.status === "comparing") return { ...out, message: "Its comparison is still being rendered: call get_proposal_status again." };
   if (r.status !== "review") return out;
   const left = Math.max(0, Math.min(MAX_ROUNDS - r.compare.done, MAX_SUBMISSIONS - r.compare.round));
@@ -374,9 +376,11 @@ export async function getProposalStatus(args, { wait = WAIT_MS } = {}) {
 /** Gallery id of an official template, from its card name: "Cubo de fichas" → "cubo-de-fichas". */
 export const slugOf = name => String(name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/g, "") || "plantilla";
 /** A slug no Studio template uses yet (official templates are files of the Studio: plantillas/<slug>-<variant>.json). */
-export async function freeSlug(name, sourceSlug, fetcher = fetch) {
+export async function freeSlug(name, sourceSlug, fetcher = fetch, id = null) {
   const base = slugOf(name);
-  const taken = async slug => { try { const r = await fetcher(`${STUDIO_URL}/plantillas/${slug}-vertical.json`, { method: "HEAD", signal: AbortSignal.timeout(8000) }); return r.ok && !/text\/html/.test(r.headers?.get?.("content-type") || ""); } catch { return false; } };
+  // a slug held by another template's open pull request counts as taken too
+  const held = async slug => { const c = await getJson(`community/slugs/${slug}.json`); return !!c && c.id !== id; };
+  const taken = async slug => { if (await held(slug)) return true; try { const r = await fetcher(`${STUDIO_URL}/plantillas/${slug}-vertical.json`, { method: "HEAD", signal: AbortSignal.timeout(8000) }); return r.ok && !/text\/html/.test(r.headers?.get?.("content-type") || ""); } catch { return false; } };
   for (const slug of [base, `${base}-${String(sourceSlug).replace(/[^a-z0-9]/g, "").slice(-6)}`]) if (!(await taken(slug))) return slug;
   return `${base}-${randomBytes(3).toString("hex")}`;
 }
@@ -393,7 +397,8 @@ export async function publishTemplate(args, { now = Date.now(), dispatch = dispa
   const r = path && await getJson(path);
   if (!r || r.code !== code) return { accepted: false, error: "No proposal with that code." };
   if (r.status !== "review" || !r.compare?.ok) return { accepted: false, ...publicRecord(r), error: r.status === "comparing" ? "Its comparison is still being rendered: look at it with get_proposal_status first." : r.status === "review" ? "Its last comparison failed: fix it and send it again with propose_template first." : `This proposal is ${r.status}.` };
-  const slug = await freeSlug(r.card.name, r.source.id, fetcher);
+  const slug = r.official?.slug ?? await freeSlug(r.card.name, r.source.id, fetcher, r.id);
+  await putJson(`community/slugs/${slug}.json`, { id: r.id });
   const branch = TEMPLATE_BRANCH();
   Object.assign(r, { status: "rendering", notes, updated: iso(now), official: { slug, branch, by } });
   await putJson(path, r);
@@ -403,7 +408,7 @@ export async function publishTemplate(args, { now = Date.now(), dispatch = dispa
     await putJson(path, r);
     return { accepted: false, ...publicRecord(r), error: "The publishing job could not be started right now; call publish_template again later with the same code." };
   }
-  return { accepted: true, ...publicRecord(r), message: `Publishing as the official template «${r.card.name}» (${slug}): its gallery videos are rendered and the template is committed to the Studio code on branch ${branch}. It appears in the gallery once that branch is deployed; get_proposal_status tells when it is committed.` };
+  return { accepted: true, ...publicRecord(r), message: `Publishing as the official template «${r.card.name}» (${slug}): its gallery videos are rendered (a few minutes) and a pull request is opened against ${branch} with its own preview. Call get_proposal_status with the code until it is published: it gives the pull request link, where the moderator approves or discards it.` };
 }
 
 /** Starts a job of the Studio repo's community workflow (reference, compare or render). Needs GITHUB_DISPATCH_TOKEN. */
@@ -515,13 +520,14 @@ export async function putMedia(id, file, bytes) {
 }
 
 /** Render job finished (ok) or failed (reason): publish it or tell the user why not. */
-export async function finishRender(id, { ok, reason, commit }, now = Date.now()) {
+export async function finishRender(id, { ok, reason, commit, pr }, now = Date.now()) {
   const r = await getJson(`community/records/${id}.json`);
   if (!r) return { ok: false, error: "Unknown template." };
   if (r.status !== "rendering") return { ok: false, error: `Not rendering (${r.status}).` };
   if (ok) Object.assign(r, { status: "published", published: new Date(now).toISOString(), reason: null });
   else Object.assign(r, { status: r.official ? "review" : "failed", reason: String(reason || "The preview could not be rendered.").slice(0, 300) });
   if (r.official && ok && typeof commit === "string" && /^[0-9a-f]{7,40}$/.test(commit)) r.official.commit = commit;
+  if (r.official && ok && typeof pr === "string" && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(pr)) r.official.pr = pr;
   await putJson(`community/records/${id}.json`, r);
   // official templates live in the Studio code; the Community index only keeps the ones published before
   if (!r.official) await updateIndex(r);
