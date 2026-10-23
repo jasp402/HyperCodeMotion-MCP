@@ -1,13 +1,1 @@
-{
-  "name": "@hypercodemotion/mcp",
-  "version": "0.8.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test",
-    "test:live": "node scripts/smoke.mjs"
-  },
-  "dependencies": {
-    "@vercel/blob": "^2.8.2"
-  }
-}
+{"name":"@hypercodemotion/mcp","version":"0.8.0","private":true,"type":"module","scripts":{"test":"node --test","test:live":"node scripts/smoke.mjs"},"dependencies":{"@vercel/blob":"^2.8.2","@sparticuz/chromium":"^141.0.0","playwright-core":"^1.56.1"}}
