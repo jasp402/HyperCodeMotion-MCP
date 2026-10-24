@@ -229,6 +229,21 @@ test("a moderator restarts a proposal left idle in another session", async () =>
   assert.equal(fresh.accepted, true); assert.notEqual(fresh.code, r.code);
   assert.equal((await getProposalStatus({ code: r.code }, { wait: 0 })).found, false);
 });
+test("a revision can send only a patch and keep the card", async () => {
+  setStore(mem()); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  await brief({ ...A, url }, opts); await referenceReady(id);
+  assert.equal((await proposeTemplate({ ...A, url, patch: [{ op: "replace", path: "/fps", value: 30 }] }, opts)).errors[0].code, "PATCH_NEEDS_CODE");
+  const r = await proposeTemplate({ ...A, url, compositions: compositions(), card }, opts);
+  await compared(id, 1);
+  assert.equal((await proposeTemplate({ ...A, url, code: r.code, patch: [{ op: "replace", path: "/layers/99/x", value: 1 }] }, opts)).errors[0].code, "PATCH_PATH");
+  const before = (await readTemplate(id, "vertical")).layers.length;
+  const p = await proposeTemplate({ ...A, url, code: r.code, patch: [{ op: "add", path: "/layers/-", value: { id: "extra", type: "rect", start: 0, end: 1, props: { x: 10, y: 10, w: 20, h: 20, fill: "#ffffff" } }, variants: ["vertical"] }] }, opts);
+  assert.equal(p.accepted, true, JSON.stringify(p.errors)); assert.equal(p.round, 2);
+  assert.equal((await readTemplate(id, "vertical")).layers.length, before + 1);
+  assert.equal((await readTemplate(id, "cuadrado")).layers.length, before);
+  assert.equal((await readRecord(id)) , null, "not published yet");
+});
 test("daily limit per caller", async () => {
   setStore(mem());
   const ids = Array.from({ length: MAX_PER_DAY + 1 }, (_, i) => `https://prompt-motion.com/autor-${i}abc`);

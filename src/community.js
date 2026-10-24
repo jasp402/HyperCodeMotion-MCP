@@ -29,6 +29,7 @@
  * Moderator codes: TEMPLATE_ADMIN_CODES (or COMMUNITY_ADMIN_SECRET) holds one code or a list
  * "name:code, name:code"; the name is recorded with each template.
  */
+import { applyPatch } from "./patch.js";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { validateJson } from "./contract.js";
 import { checkComposition } from "./hcmotion.js";
@@ -340,9 +341,26 @@ export async function proposeTemplate(args, { now = Date.now(), dispatch = dispa
   const ref = await getJson(refPath(src.id));
   if (ref?.status !== "ready") return fail("REFERENCE_NOT_READY", "Call get_recreation_brief with this url first and build from its reference frames.", "$.url");
 
-  const { errors, compositions } = checkCompositions(args.compositions);
+  // una revisión puede mandar solo los cambios (patch) y omitir la tarjeta: se aplican a lo ya guardado
+  let given = args.compositions;
+  if (args.patch != null) {
+    if (!revision) return fail("PATCH_NEEDS_CODE", "patch only revises a proposal: send it with its code. A first proposal sends the full compositions.", "$.patch");
+    if (given != null) return fail("PATCH_AND_COMPOSITIONS", "Send either compositions or patch, not both.", "$.patch");
+    const stored = {};
+    for (const f of FORMATS) {
+      const c = await getJson(`community/templates/${src.id}/${f.variant}.json`);
+      if (!c) return fail("PATCH_BASE_MISSING", "The stored compositions are missing: send the full compositions.", "$.patch");
+      const { community, ...rest } = c;
+      stored[f.variant] = rest;
+    }
+    const p = applyPatch(stored, args.patch);
+    if (p.errors.length) return { accepted: false, errors: p.errors };
+    given = p.docs;
+  }
+  const cardIn = args.card ?? (revision ? (({ duration, ...c }) => c)(existing.card) : undefined);
+  const { errors, compositions } = checkCompositions(given);
   const duration = compositions.horizontal?.duration ?? compositions.cuadrado?.duration ?? MAX_DURATION;
-  errors.push(...checkCard(args.card, duration));
+  errors.push(...checkCard(cardIn, duration));
   if (errors.length) return { accepted: false, errors };
 
   if (!revision) {
@@ -355,7 +373,7 @@ export async function proposeTemplate(args, { now = Date.now(), dispatch = dispa
     await putJson(limitsPath, limits);
   }
 
-  const card = { name: args.card.name.trim(), description: args.card.description.trim(), chips: args.card.chips.map(c => c.trim()), group: args.card.group, moments: args.card.moments.map(([n, a, b]) => [n.trim(), a, b]), duration };
+  const card = { name: cardIn.name.trim(), description: cardIn.description.trim(), chips: cardIn.chips.map(c => c.trim()), group: cardIn.group, moments: cardIn.moments.map(([n, a, b]) => [n.trim(), a, b]), duration };
   const page = revision ? null : await readSource(src, fetcher).catch(() => ({}));
   const variant = closestVariant(ref.width, ref.height);
   const record = {
@@ -399,12 +417,12 @@ export async function getProposalStatus(args, { wait = WAIT_MS } = {}) {
   // filtro sin LLM: por debajo de la nota mínima no hace falta mirar la lámina, el informe dice qué corregir
   if (mt && mt.score < PASS_SCORE && left > 0) return {
     ...out, compare: { ...compare, passScore: PASS_SCORE, report: mt.report },
-    message: `Measured without images: score ${mt.score}/100, below ${PASS_SCORE}. ${mt.report} Fix those moments (layout, sizes, positions, colors, timing) in all three compositions and call propose_template again with this code (${left} left). The sheet is only shown once the score reaches ${PASS_SCORE}.`
+    message: `Measured without images: score ${mt.score}/100, below ${PASS_SCORE}. ${mt.report} Fix those moments (layout, sizes, positions, colors, timing) and call propose_template again with this code and a patch (only the changes) (${left} left). The sheet is only shown once the score reaches ${PASS_SCORE}.`
   };
   const sheet = await jpg(`community/compare/${r.id}/sheet.jpg`);
   return {
     ...out, compare: { ...compare, ...(mt ? { passScore: PASS_SCORE, report: mt.report } : {}), how: "In the attached sheet each pair is one moment: left the original, right your recreation rendered by the Studio engine (times given as [original, recreation] in seconds; the recreation's time is scaled to its duration)." },
-    message: `Compare every pair: layout, sizes, positions, timing, colors, typefaces and texts. If something differs, fix it in all three compositions and call propose_template again with this code (${left} left). When it truly looks like the original, call publish_template with this code and notes on what is consciously different and why.`,
+    message: `Compare every pair: layout, sizes, positions, timing, colors, typefaces and texts. If something differs, call propose_template again with this code and a patch (only the changes) (${left} left). When it truly looks like the original, call publish_template with this code and notes on what is consciously different and why.`,
     _images: sheet ? [sheet] : []
   };
 }
