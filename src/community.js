@@ -52,7 +52,7 @@ export const MAX_ROUNDS = 3;
 const MAX_SUBMISSIONS = MAX_ROUNDS * 2;
 const STALE_MS = 24 * 3600e3;      // a proposal left unpublished this long frees its video for someone else
 const RETRY_MS = 15 * 60e3;        // a reference job that did not answer in this time is started again
-const WAIT_MS = 40e3;              // tools wait this long for a running job before answering
+const WAIT_MS = 52e3;              // tools wait this long for a running job before answering (the function may run 60 s)
 const UPLOAD_MS = 60 * 60e3;       // an upload not finished in this time is started again with a new key
 export const PART_BYTES = 3_000_000; // the original is sent in parts that fit a function's request body
 export const MAX_PARTS = 20;
@@ -172,9 +172,9 @@ const jpg = async path => { const b = await (await store()).get(path); return b 
 export const closestVariant = (w, h) => (w / h > 1.2 ? "horizontal" : w / h < 0.8 ? "vertical" : "cuadrado");
 
 const publicRecord = r => r && { template: r.official?.slug ?? r.id, code: r.code, status: r.status, reason: r.reason ?? null, name: r.card?.name ?? null, source: r.source.url, published: r.status === "published", ...(r.official ? { official: { slug: r.official.slug, branch: r.official.branch, commit: r.official.commit ?? null, pr: r.official.pr ?? null } } : {}) };
-const live = (r, now) => ["comparing", "review"].includes(r.status) && now - Date.parse(r.updated || r.created) < STALE_MS;
+const live = (r, now) => ["draft", "comparing", "review"].includes(r.status) && now - Date.parse(r.updated || r.created) < STALE_MS;
 /** A record that keeps its video from being proposed again by someone else. */
-const holds = (r, now) => r && r.status !== "failed" && (!["comparing", "review"].includes(r.status) || live(r, now));
+const holds = (r, now) => r && r.status !== "failed" && (!["draft", "comparing", "review"].includes(r.status) || live(r, now));
 
 const refPath = (id, f = "meta.json") => `community/refs/${id}/${f}`;
 /** The source video's reference frames: extracted once per video by the render workflow. */
@@ -226,7 +226,7 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
   // composiciones: un moderador que vuelve a mandar el enlace la descarta y empieza de nuevo
   let restarted = null;
   // (solo si lleva IDLE_RESTART_MS sin moverse: la misma sesión que vuelve a llamar no pierde su trabajo)
-  if (holds(existing, now) && ["comparing", "review"].includes(existing.status) && now - Date.parse(existing.updated || existing.created || 0) > IDLE_RESTART_MS) {
+  if (holds(existing, now) && ["draft", "comparing", "review"].includes(existing.status) && now - Date.parse(existing.updated || existing.created || 0) > IDLE_RESTART_MS) {
     restarted = existing.code;
     await putJson(`community/records/${src.id}.json`, { ...existing, status: "failed", reason: `Restarted by moderator ${moderatorOf(args.adminCode)}.`, updated: iso(now) });
   } else if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a gallery template (or one is being made from it). Do not recreate it: give the user this status." };
@@ -296,9 +296,17 @@ function checkCard(card, duration) {
   return errors;
 }
 
+/**
+ * Checks of measured text and timing that are estimates: the official gallery templates themselves break them
+ * (texts that wrap in their box, pieces that bleed off the edge on purpose, layers ending after the video).
+ * In a proposal they are warnings; the comparison with the original is what judges the result.
+ */
+export const SOFT_CODES = new Set(["HTML_DOES_NOT_FIT", "HTML_OUTSIDE_CANVAS", "HTML_LINE_HEIGHT", "TEXT_OUTSIDE_CANVAS", "OUTSIDE_DURATION"]);
+const MAX_ERRORS = 12;               // errors and warnings returned at most (the rest are counted)
+const MAX_DRAFT_ATTEMPTS = 6;        // rejected sends of one proposal before it stops taking more
 /** The three compositions: valid, in their format, short enough and carrying the HyperCodeMotion signature. */
-function checkCompositions(compositions) {
-  const errors = [];
+export function checkCompositions(compositions) {
+  const errors = [], warnings = [];
   if (!compositions || typeof compositions !== "object") return { errors: [{ path: "$.compositions", code: "MISSING", message: "compositions must hold cuadrado, vertical and horizontal." }] };
   const out = {};
   for (const f of FORMATS) {
@@ -310,14 +318,16 @@ function checkCompositions(compositions) {
     if (raw.length > MAX_COMPOSITION_BYTES) { errors.push({ path: p, code: "TOO_LARGE", message: "Larger than 1.2 MB: simplify it." }); continue; }
     const report = validateJson(c);
     if (report.format !== "composition") { errors.push({ path: p, code: "NOT_A_COMPOSITION", message: "Needs a full composition (version, width, height, fps, duration, layers)." }); continue; }
-    errors.push(...[...report.errors, ...checkComposition(c)].map(e => ({ ...e, path: p + e.path.slice(1) })));
+    for (const e of [...report.errors, ...checkComposition(c)]) (SOFT_CODES.has(e.code) ? warnings : errors).push({ ...e, path: p + e.path.slice(1) });
     if (c.width !== f.width || c.height !== f.height) errors.push({ path: p, code: "WRONG_SIZE", message: `Must be ${f.width}×${f.height}.` });
     if (c.duration > MAX_DURATION) errors.push({ path: p + ".duration", code: "TOO_LONG", message: `At most ${MAX_DURATION} s.` });
     if (!/HyperCodeMotion/.test(raw)) errors.push({ path: p, code: "NO_SIGNATURE", message: "The hero or signature must be HyperCodeMotion (see the brief)." });
     out[f.variant] = c;
   }
-  return { errors, compositions: out };
+  return { errors, warnings, compositions: out };
 }
+/** At most MAX_ERRORS items, plus how many were left out. */
+const cap = list => list.length > MAX_ERRORS ? [...list.slice(0, MAX_ERRORS), { path: "$", code: "MORE", message: `${list.length - MAX_ERRORS} more of the same kinds: fix these first.` }] : list;
 
 const normCode = c => String(c ?? "").trim().toLowerCase();
 const CODE = /^[0-9a-z]{6,12}[0-9a-f]{8}$/;
@@ -331,11 +341,14 @@ export async function proposeTemplate(args, { now = Date.now(), dispatch = dispa
   if (!by) return fail("MODERATOR_CODE", NEEDS_CODE, "$.adminCode");
   const existing = await getJson(`community/records/${src.id}.json`);
   const code = args.code == null ? "" : normCode(args.code);
-  const revision = !!code && existing?.code === code;
+  // un envío sin código sobre un borrador vivo lo continúa (Claude a veces reenvía todo sin el código)
+  const resumesDraft = !code && existing?.status === "draft" && holds(existing, now);
+  const revision = resumesDraft || (!!code && existing?.code === code);
   if (code && !revision) return fail("UNKNOWN_CODE", "No proposal of this video has that code. Leave code out for a first proposal.", "$.code");
   if (revision) {
+    if (existing.status === "draft" && (existing.attempts || 0) >= MAX_DRAFT_ATTEMPTS) return fail("DRAFT_ATTEMPTS", `It was rejected ${MAX_DRAFT_ATTEMPTS} times: stop here and tell the user what keeps failing.`, "$.code");
     if (existing.status === "comparing") return fail("COMPARING", "Its comparison is still being rendered: call get_proposal_status with the code first.", "$.code");
-    if (existing.status !== "review") return { ...fail("NOT_REVISABLE", `This proposal is ${existing.status}; it can no longer be changed.`, "$.code"), ...publicRecord(existing) };
+    if (!["review", "draft"].includes(existing.status)) return { ...fail("NOT_REVISABLE", `This proposal is ${existing.status}; it can no longer be changed.`, "$.code"), ...publicRecord(existing) };
     if (existing.compare.done >= MAX_ROUNDS || existing.compare.round >= MAX_SUBMISSIONS) return fail("ROUNDS_USED", `It already used its ${MAX_ROUNDS} comparisons: publish it with publish_template if it is faithful, or stop here.`, "$.code");
   } else if (holds(existing, now)) return { accepted: false, duplicate: true, ...publicRecord(existing), errors: [{ path: "$.url", code: "ALREADY_EXISTS", message: "This video is already a gallery template (or one is being made from it); give the user this status." }] };
   const ref = await getJson(refPath(src.id));
@@ -357,11 +370,12 @@ export async function proposeTemplate(args, { now = Date.now(), dispatch = dispa
     if (p.errors.length) return { accepted: false, errors: p.errors };
     given = p.docs;
   }
-  const cardIn = args.card ?? (revision ? (({ duration, ...c }) => c)(existing.card) : undefined);
-  const { errors, compositions } = checkCompositions(given);
+  const cardIn = args.card ?? (revision && existing.card ? (({ duration, ...c }) => c)(existing.card) : undefined);
+  const { errors, warnings: soft, compositions } = checkCompositions(given);
   const duration = compositions.horizontal?.duration ?? compositions.cuadrado?.duration ?? MAX_DURATION;
-  errors.push(...checkCard(cardIn, duration));
-  if (errors.length) return { accepted: false, errors };
+  const cardErrors = checkCard(cardIn, duration);
+  errors.push(...cardErrors);
+  const warnings = cap(soft);
 
   if (!revision) {
     const limitsPath = `community/limits/${day(now)}.json`;
@@ -373,27 +387,49 @@ export async function proposeTemplate(args, { now = Date.now(), dispatch = dispa
     await putJson(limitsPath, limits);
   }
 
-  const card = { name: cardIn.name.trim(), description: cardIn.description.trim(), chips: cardIn.chips.map(c => c.trim()), group: cardIn.group, moments: cardIn.moments.map(([n, a, b]) => [n.trim(), a, b]), duration };
   const page = revision ? null : await readSource(src, fetcher).catch(() => ({}));
+  const source = revision ? existing.source : { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title ?? ref.info?.title ?? null, author: page.author ?? ref.info?.author ?? null, authorUrl: page.authorUrl ?? ref.info?.authorUrl ?? null };
+  if (errors.length) {
+    // rechazada: se guarda como borrador (si las tres se leyeron) para corregirla con patch en vez de reenviarla entera
+    if (FORMATS.some(f => !compositions[f.variant])) return { accepted: false, errors: cap(errors), warnings };
+    const draft = {
+      id: src.id, code: revision ? existing.code : `${now.toString(36)}${randomBytes(4).toString("hex")}`, status: revision && existing.status === "review" ? "review" : "draft",
+      created: revision ? existing.created : iso(now), updated: iso(now), source, card: cardErrors.length ? (revision ? existing.card : null) : { ...cardIn, duration },
+      variant: closestVariant(ref.width, ref.height), reason: null, by: revision ? existing.by ?? by : by, attempts: (revision ? existing.attempts || 0 : 0) + 1,
+      compare: revision ? existing.compare : { round: 0, done: 0, ok: null, reason: null, times: null }
+    };
+    // una revisión rechazada de algo ya comparado no pisa lo comparado
+    if (draft.status === "draft") {
+      for (const f of FORMATS) await putJson(`community/templates/${src.id}/${f.variant}.json`, { ...compositions[f.variant], community: { template: src.id, source: source.url } });
+      if (!revision) await putJson(`community/codes/${draft.code}.json`, { id: src.id });
+      await putJson(`community/records/${src.id}.json`, draft);
+    }
+    return {
+      accepted: false, code: draft.code, status: draft.status, attempts: draft.attempts, errors: cap(errors), warnings,
+      message: draft.status === "draft"
+        ? `Not accepted, but saved as a draft: fix only what errors list by calling propose_template again with this code and patch (the changes), not the full compositions (${MAX_DRAFT_ATTEMPTS - draft.attempts} tries left).`
+        : "Not accepted; the compared version is kept. Fix only what errors list and send it again with this code and patch."
+    };
+  }
+  const card = { name: cardIn.name.trim(), description: cardIn.description.trim(), chips: cardIn.chips.map(c => c.trim()), group: cardIn.group, moments: cardIn.moments.map(([n, a, b]) => [n.trim(), a, b]), duration };
   const variant = closestVariant(ref.width, ref.height);
   const record = {
     id: src.id, code: revision ? existing.code : `${now.toString(36)}${randomBytes(4).toString("hex")}`, status: "comparing",
     created: revision ? existing.created : iso(now), updated: iso(now),
-    source: revision ? existing.source : { site: src.site, page: src.page, id: src.slug, url: src.url, title: page.title ?? ref.info?.title ?? null, author: page.author ?? ref.info?.author ?? null, authorUrl: page.authorUrl ?? ref.info?.authorUrl ?? null },
-    card, variant, reason: null, by: revision ? existing.by ?? by : by,
-    compare: { round: revision ? existing.compare.round + 1 : 1, done: revision ? existing.compare.done : 0, ok: null, reason: null, times: null }
+    source, card, variant, reason: null, by: revision ? existing.by ?? by : by,
+    attempts: 0, compare: { round: revision ? existing.compare.round + 1 : 1, done: revision ? existing.compare.done : 0, ok: null, reason: null, times: null }
   };
   for (const f of FORMATS) {
     const c = { ...compositions[f.variant], name: `${card.name} (${f.variant})`, community: { template: src.id, source: record.source.url } };
     await putJson(`community/templates/${src.id}/${f.variant}.json`, c);
   }
-  if (!revision) await putJson(`community/codes/${record.code}.json`, { id: src.id });
+  if (!revision || !(await getJson(`community/codes/${record.code}.json`))) await putJson(`community/codes/${record.code}.json`, { id: src.id });
   const sent = await dispatch("compare", src.id, { variant, round: record.compare.round, video: ref.video, ...(ref.uploaded ? { upload: ref.uploaded } : {}) }).catch(() => false);
   if (!sent) Object.assign(record, { status: "review", compare: { ...record.compare, ok: false, reason: "The comparison could not be started right now: send it again later with the same code." } });
   await putJson(`community/records/${src.id}.json`, record);
   return {
-    accepted: true, ...publicRecord(record), round: record.compare.round, errors: [],
-    message: sent ? `Accepted for comparison: the ${variant} composition (the original's format) is being rendered with the Studio engine and compared with the original, frame by frame. Call get_proposal_status with the code until its status is review (each call waits up to about 40 s).` : record.compare.reason
+    accepted: true, ...publicRecord(record), round: record.compare.round, errors: [], warnings,
+    message: sent ? `Accepted for comparison: the ${variant} composition (the original's format) is being rendered with the Studio engine and compared with the original, frame by frame. Call get_proposal_status with the code until its status is review (each call waits up to about 50 s).` : record.compare.reason
   };
 }
 
@@ -408,6 +444,7 @@ export async function getProposalStatus(args, { wait = WAIT_MS } = {}) {
   r = await waitFor(path, r, x => x.status !== "comparing", wait);
   const out = { found: true, ...publicRecord(r), studio: r.status === "published" ? (r.official ? (r.official.pr ? `Pull request ${r.official.pr}: its preview shows the template in the gallery (Explorar animaciones: «${r.card?.name}»); merging it adds it to ${r.official.branch}.` : `Committed to ${r.official.branch}.`) : `${STUDIO_URL} (Explorar animaciones, card marked «Community»)`) : null };
   if (r.status === "comparing") return { ...out, message: "Its comparison is still being rendered: call get_proposal_status again." };
+  if (r.status === "draft") return { ...out, attempts: r.attempts, message: "A draft that did not pass the checks: fix it with propose_template, this code and patch (the errors it returned say what)." };
   if (r.status !== "review") return out;
   const left = Math.max(0, Math.min(MAX_ROUNDS - r.compare.done, MAX_SUBMISSIONS - r.compare.round));
   const compare = { round: r.compare.round, ok: r.compare.ok, reason: r.compare.reason, variant: r.variant, times: r.compare.times, revisionsLeft: left };
