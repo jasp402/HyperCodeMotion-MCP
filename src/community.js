@@ -158,6 +158,8 @@ export async function readSource(src, fetcher = fetch) {
 }
 
 const iso = t => new Date(t).toISOString();
+/** Una propuesta sin publicar quieta este tiempo se puede reiniciar mandando otra vez el enlace. */
+export const IDLE_RESTART_MS = 20 * 60e3;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 /** Re-reads `path` until `done` holds or `wait` ms pass. */
 async function waitFor(path, value, done, wait) {
@@ -219,7 +221,14 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
   if (src.error) return { ok: false, error: src.error };
   if (!moderatorOf(args.adminCode)) return { ok: false, needsCode: true, error: NEEDS_CODE };
   const existing = await getJson(`community/records/${src.id}.json`);
-  if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a gallery template (or one is being made from it). Do not recreate it: give the user this status." };
+  // una propuesta sin publicar (comparando o en revisión) quedó en otra sesión, que no se puede retomar sin sus
+  // composiciones: un moderador que vuelve a mandar el enlace la descarta y empieza de nuevo
+  let restarted = null;
+  // (solo si lleva IDLE_RESTART_MS sin moverse: la misma sesión que vuelve a llamar no pierde su trabajo)
+  if (holds(existing, now) && ["comparing", "review"].includes(existing.status) && now - Date.parse(existing.updated || existing.created || 0) > IDLE_RESTART_MS) {
+    restarted = existing.code;
+    await putJson(`community/records/${src.id}.json`, { ...existing, status: "failed", reason: `Restarted by moderator ${moderatorOf(args.adminCode)}.`, updated: iso(now) });
+  } else if (holds(existing, now)) return { ok: true, alreadyExists: true, ...publicRecord(existing), message: "This video is already a gallery template (or one is being made from it). Do not recreate it: give the user this status." };
   const given = fromCaller(args, src);
   if (given.badVideo) return { ok: false, template: src.id, error: `video must be the address of the page's own video file (an .mp4 on ${SOURCES[src.host].videoHost}).` };
   // the source sites often refuse this server (bot checks): what the caller read on the page fills the gaps
@@ -229,7 +238,7 @@ export async function getRecreationBrief(args, { fetcher = fetch, dispatch = dis
   if (ref.status === "missing") return { ok: false, template: src.id, needsPage: true, error: `This server could not read the page${page.error ? ` (${page.error})` : ""}. Open the page yourself, then call get_recreation_brief again with the url and what the page shows: video (the address of its .mp4 file, on ${SOURCES[src.host].videoHost}), prompt, title and author.` };
   if (ref.status === "failed") return { ok: false, template: src.id, error: `${ref.reason || "The video could not be read."} A template is only made when it can be compared with its original video, so this one cannot be recreated now.` };
   const out = {
-    ok: true, alreadyExists: false, template: src.id,
+    ok: true, alreadyExists: false, template: src.id, ...(restarted ? { restarted: `An unfinished proposal of this video (code ${restarted}) was discarded: start over from this brief.` } : {}),
     source: { site: src.site, page: src.page, id: src.slug, url: src.url, title: info.title, author: info.author, authorUrl: info.authorUrl, video: info.video || ref.video },
     prompt: info.prompt, promptComplete: info.promptComplete,
     note: info.prompt ? (info.promptComplete ? "prompt is the full prompt published with the video." : "prompt may be only part of the original prompt: the reference frames are what to follow.") : "The page's prompt is not known here: read it on the page; the reference frames are what to follow.",

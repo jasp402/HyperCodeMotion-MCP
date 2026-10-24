@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, putUpload, finishUpload, readUpload, retire, readIndex, readTemplate, readRecord, setStore, moderators, moderatorOf, slugOf, MAX_PER_DAY, MAX_ROUNDS, PASS_SCORE } from "../src/community.js";
+import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, putUpload, finishUpload, readUpload, retire, readIndex, readTemplate, readRecord, setStore, moderators, moderatorOf, slugOf, MAX_PER_DAY, MAX_ROUNDS, PASS_SCORE, IDLE_RESTART_MS } from "../src/community.js";
 import { getTemplate } from "../src/templates.js";
 import handler from "../api/community.js";
 
@@ -215,6 +215,19 @@ test("a low measured score answers in text, without the sheet", async () => {
   await finishCompare(id, { round: 2, ok: true, times: [[2.5, 2.5]], metrics: high });
   const ok = await getProposalStatus({ code: r.code }, { wait: 0 });
   assert.equal(ok.compare.score, PASS_SCORE + 10); assert.equal(ok._images.length, 1);
+});
+test("a moderator restarts a proposal left idle in another session", async () => {
+  setStore(mem()); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe", now = Date.now();
+  await brief({ ...A, url }, opts); await referenceReady(id);
+  const r = await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...opts, now });
+  await compared(id, 1);
+  assert.equal((await brief({ ...A, url }, { ...opts, now: now + 60e3 })).alreadyExists, true, "the same session keeps its work");
+  const again = await brief({ ...A, url }, { ...opts, now: now + IDLE_RESTART_MS + 60e3 });
+  assert.equal(again.alreadyExists, false); assert.match(again.restarted, new RegExp(r.code)); assert.equal(again.reference.status, "ready");
+  const fresh = await proposeTemplate({ ...A, url, compositions: compositions(), card }, { ...opts, now: now + IDLE_RESTART_MS + 120e3 });
+  assert.equal(fresh.accepted, true); assert.notEqual(fresh.code, r.code);
+  assert.equal((await getProposalStatus({ code: r.code }, { wait: 0 })).found, false);
 });
 test("daily limit per caller", async () => {
   setStore(mem());
