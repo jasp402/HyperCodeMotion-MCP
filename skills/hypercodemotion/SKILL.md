@@ -1,6 +1,6 @@
 ---
 name: hypercodemotion
-description: Turn briefs, images, reference videos, scripts, assets and existing projects into professional, editable HyperCodeMotion JSON. Guides art direction, scene architecture, motion, asset integration, MCP checks and Studio handoff.
+description: Create and edit motion graphics videos (launch promos, explainers, social reels, animated titles) as editable HyperCodeMotion projects. Asks the canvas size first, then guides art direction, scenes, motion and assets, and delivers a .hcmotion file through the HyperCodeMotion MCP.
 ---
 
 # HyperCodeMotion — Creative Composition Skill
@@ -9,13 +9,22 @@ Use this Skill when asked to create, improve, extend, combine, or troubleshoot e
 
 ## Workflow (follow in order)
 
-1. **Brief and inputs** — Identify purpose, audience, distribution format, duration, fps, language, brand, CTA (only when requested), narration and exact data. Analyze user-provided reference images/video, scripts, logos, visual assets and any existing JSON. Distinguish factual content from creative decisions. Ask only for information that blocks progress.
-2. **Art direction** — Define visual concept, typography hierarchy, spacing grid, palette, contrast, material, rhythm, transition vocabulary and continuity. Reuse the actual reference's visual intent; do not invent a brand or factual measurements. When the request names a Studio gallery template (an id such as `mix-promo-editorial`), call `get_template` with that id and the video's format, and follow its design: palette, fonts, frame, scene system and motion; replace all its texts.
-3. **Storyboard and scenes** — Create sequential beats with one communicative objective each. Decide which objects persist and transform between beats versus which appear only within one scene. Allocate time to reading and transitions; storyboard timing must fit total duration.
-4. **Composition plan** — Default to **HTML scenes**: one HTML document per scene in `docs`, each visible piece marked `data-hcm` and animated by its own `html` layer (see [html-scenes](references/html-scenes.md) and [the example](examples/html-scene-launch.json)). Use native layers (`text`, `rect`, `particles`…) when a piece must be edited as geometry or needs per-property keyframes. Plan layer IDs, order, scene boundaries, assets, effects and audio.
-5. **JSON generation** — Produce **one complete, standalone composition** with `layers` at the root. To change an existing project, return the whole updated composition (keep unchanged layers, IDs and assets as they were), not a patch: a `.hcmotion` file can only carry a full composition.
-6. **MCP validation** — The HyperCodeMotion MCP (`https://mcp.hypercodemotion.com/mcp`) is required. Call `get_capabilities` before selecting layer/effect fields; `validate_json` is optional for drafts. **Do not claim validation if no call occurred.**
-7. **Studio handoff** — Call `create_hcmotion` with the finished JSON. If `created` is false, fix every error and call it again. Give the user the two links it returns: `open` (opens the project in Studio) and `download` (the `.hcmotion` file, to keep or load later with «Cargar proyecto»), and say both expire in 24 hours. **Never paste the composition JSON for the user to copy:** Studio only opens `.hcmotion` files. If the MCP is not connected, stop and ask the user to connect it instead of returning JSON. Never claim a perfect render from MCP results alone.
+1. **Canvas size first** — Before designing anything, know the canvas. If the request does not state a format or exact pixels, ask the user once, in their language, and wait for the answer:
+   - 9:16 vertical, 1080×1920 (Reels, TikTok, Shorts)
+   - 1:1 square, 1080×1080
+   - 4:5 portrait, 1080×1350 (feed posts)
+   - 3:4 portrait, 1080×1440
+   - 16:9 horizontal, 1920×1080 (YouTube, presentations)
+   - Custom: their own width × height in pixels.
+
+   Accept a platform name as the answer («para Reels» means 9:16). Ask this together with any other blocking question, never as a second round. Use the chosen `width` and `height` everywhere: type sizes, margins and the safe area depend on it (see [composition.md](references/composition.md)). Never switch to another format later without asking. Do not ask when the size is already known: an existing project keeps its own `width` and `height`, a prompt copied from Studio states its format, and a gallery recreation follows its brief.
+2. **Brief and inputs** — Identify purpose, audience, distribution format, duration, fps, language, brand, CTA (only when requested), narration and exact data. Analyze user-provided reference images/video, scripts, logos, visual assets and any existing JSON. Distinguish factual content from creative decisions. Ask only for information that blocks progress.
+3. **Art direction** — Define visual concept, typography hierarchy, spacing grid, palette, contrast, material, rhythm, transition vocabulary and continuity. Reuse the actual reference's visual intent; do not invent a brand or factual measurements. When the request names a Studio gallery template (an id such as `mix-promo-editorial`), call `get_template` with that id and the video's format, and follow its design: palette, fonts, frame, scene system and motion; replace all its texts.
+4. **Storyboard and scenes** — Create sequential beats with one communicative objective each. Decide which objects persist and transform between beats versus which appear only within one scene. Allocate time to reading and transitions; storyboard timing must fit total duration.
+5. **Composition plan** — Default to **HTML scenes**: one HTML document per scene in `docs`, each visible piece marked `data-hcm` and animated by its own `html` layer (see [html-scenes](references/html-scenes.md) and [the example](examples/html-scene-launch.json)). Use native layers (`text`, `rect`, `particles`…) when a piece must be edited as geometry or needs per-property keyframes. Plan layer IDs, order, scene boundaries, assets, effects and audio.
+6. **JSON generation** — Produce **one complete, standalone composition** with `layers` at the root. To change an existing project, return the whole updated composition (keep unchanged layers, IDs and assets as they were), not a patch: a `.hcmotion` file can only carry a full composition.
+7. **MCP validation** — The HyperCodeMotion MCP (`https://mcp.hypercodemotion.com/mcp`) is required. Call `get_capabilities` before selecting layer/effect fields; `validate_json` is optional for drafts. **Do not claim validation if no call occurred.**
+8. **Studio handoff** — Call `create_hcmotion` with the finished JSON. If `created` is false, fix every error and call it again. Give the user the two links it returns: `open` (opens the project in Studio) and `download` (the `.hcmotion` file, to keep or load later with «Cargar proyecto»), and say both expire in 24 hours. **Never paste the composition JSON for the user to copy:** Studio only opens `.hcmotion` files. If the MCP is not connected, stop and ask the user to connect it instead of returning JSON. Never claim a perfect render from MCP results alone.
 
 ## Turning a public video into a gallery template
 
@@ -51,4 +60,4 @@ Load only the applicable reference files instead of pasting all reference conten
 
 Default: a single composition object with `version: 1`, positive dimensions/fps/duration, `background`, `params`, and a nonempty `layers` array, delivered **only through `create_hcmotion`** as `.hcmotion` links. Do not put commentary inside JSON.
 
-Before output: confirm requested duration, meaningful visibility of every scene, valid asset references and `layers` at the root. If validation could not be completed, say so in your message.
+Before output: confirm the canvas size the user chose, requested duration, meaningful visibility of every scene, valid asset references and `layers` at the root. If validation could not be completed, say so in your message.
