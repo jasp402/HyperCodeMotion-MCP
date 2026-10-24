@@ -49,12 +49,12 @@ Load only the applicable reference files instead of pasting all reference conten
 - Headlines read as separate words: keep letter-spacing at or above `-0.03em` for big type (tighter makes «Escribe menos» look like one word).
 - Exact textual and numerical facts respected; no placeholder assets masquerading as real images.
 - Compositions remain editable: descriptive layer names/IDs, coherent layers, keyframes and asset references.
-- Layer effects and properties selected from actual Studio capabilities, not guessed APIs.
+- Layer effects and properties selected from actual Studio capabilities, not guessed APIs: `fx` slots and easing names as listed in [motion-design.md](references/motion-design.md), and no `UNKNOWN_…` warning left in the `create_hcmotion` result.
 - An existing Lottie, glTF or GSAP file stays one `runtime` layer (`engine`, asset id, optional text, color, node and clip). Do not redraw it as rects. Sound stays in the audio channels. `validate_json` does not render it.
 
 ## Non-negotiable truthfulness
 
-`validate_json` performs **structural preflight** against a source-pinned capability snapshot and rejects measurable text that cannot fit the canvas (`get_capabilities` field `screen`), text that crosses the canvas, and `line-height` below 1. It returns `fullyValidated: false` and **cannot verify appearance or guarantee Studio import/rendering**. Images in a prompt are references; they are not automatically embedded in JSON. The exception is files the user lists by id (photos, cut-outs, a logo, videos kept in their Studio): reference those ids in `image` and `video` layers as [the contract](references/composition.md) describes. Never invent other asset IDs, live external image URLs, render results, tool calls, or successful tests.
+`validate_json` performs **structural preflight**. Unknown layer types, properties and effects come back only as warnings (`UNKNOWN_…`), which you must read and fix; easing names and effect values are not checked (`CONTRACT_NOT_CHECKED`). It rejects measurable text that cannot fit the canvas (`get_capabilities` field `screen`), text that crosses the canvas, and `line-height` below 1. It returns `fullyValidated: false` and **cannot verify appearance or guarantee Studio import/rendering**. Images in a prompt are references; they are not automatically embedded in JSON. The exception is files the user lists by id (photos, cut-outs, a logo, videos kept in their Studio): reference those ids in `image` and `video` layers as [the contract](references/composition.md) describes. Never invent other asset IDs, live external image URLs, render results, tool calls, or successful tests.
 
 ## Output contract
 
