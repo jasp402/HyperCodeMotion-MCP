@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "name": "Scene Transitions \u2014 Reference",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "duration": 6,
+  "background": "#101018",
+  "params": {},
+  "scenes": [
+    {
+      "id": "s1",
+      "name": "Too slow.",
+      "start": 0,
+      "end": 2
+    },
+    {
+      "id": "s2",
+      "name": "Make it move.",
+      "start": 2,
+      "end": 4,
+      "transition": {
+        "type": "push",
+        "dur": 0.6,
+        "dir": "right",
+        "ease": "easeInOutCubic"
+      }
+    },
+    {
+      "id": "s3",
+      "name": "Ship it.",
+      "start": 4,
+      "end": 6,
+      "transition": {
+        "type": "zoom",
+        "dur": 0.5
+      }
+    }
+  ],
+  "layers": [
+    {
+      "id": "bg1",
+      "name": "Scene 1 background",
+      "type": "rect",
+      "start": 0,
+      "end": 2,
+      "props": {
+        "x": 540.0,
+        "y": 960.0,
+        "w": 1080,
+        "h": 1920,
+        "fill": "#101018"
+      }
+    },
+    {
+      "id": "eyebrow1",
+      "name": "Scene 1 label",
+      "type": "text",
+      "start": 0.3,
+      "end": 1.9,
+      "props": {
+        "text": "01 \u00b7 PROBLEM",
+        "x": 540,
+        "y": 820,
+        "size": 44,
+        "color": "#F6F6F5"
+      },
+      "fx": {
+        "in": {
+          "id": "fade",
+          "dur": 0.4,
+          "amount": 1
+        }
+      }
+    },
+    {
+      "id": "headline1",
+      "name": "Scene 1 headline",
+      "type": "text",
+      "start": 0.4,
+      "end": 1.9,
+      "props": {
+        "text": "Too slow.",
+        "x": 540,
+        "y": 960,
+        "size": 104,
+        "color": "#E8F27A"
+      },
+      "fx": {
+        "in": {
+          "id": "rise",
+          "dur": 0.6,
+          "amount": 1
+        }
+      }
+    },
+    {
+      "id": "bg2",
+      "name": "Scene 2 background",
+      "type": "rect",
+      "start": 2,
+      "end": 4,
+      "props": {
+        "x": 540.0,
+        "y": 960.0,
+        "w": 1080,
+        "h": 1920,
+        "fill": "#1B1030"
+      }
+    },
+    {
+      "id": "eyebrow2",
+      "name": "Scene 2 label",
+      "type": "text",
+      "start": 2.3,
+      "end": 3.9,
+      "props": {
+        "text": "02 \u00b7 IDEA",
+        "x": 540,
+        "y": 820,
+        "size": 44,
+        "color": "#F6F6F5"
+      },
+      "fx": {
+        "in": {
+          "id": "fade",
+          "dur": 0.4,
+          "amount": 1
+        }
+      }
+    },
+    {
+      "id": "headline2",
+      "name": "Scene 2 headline",
+      "type": "text",
+      "start": 2.4,
+      "end": 3.9,
+      "props": {
+        "text": "Make it move.",
+        "x": 540,
+        "y": 960,
+        "size": 104,
+        "color": "#E8F27A"
+      },
+      "fx": {
+        "in": {
+          "id": "rise",
+          "dur": 0.6,
+          "amount": 1
+        }
+      }
+    },
+    {
+      "id": "bg3",
+      "name": "Scene 3 background",
+      "type": "rect",
+      "start": 4,
+      "end": 6,
+      "props": {
+        "x": 540.0,
+        "y": 960.0,
+        "w": 1080,
+        "h": 1920,
+        "fill": "#0B2A2A"
+      }
+    },
+    {
+      "id": "eyebrow3",
+      "name": "Scene 3 label",
+      "type": "text",
+      "start": 4.3,
+      "end": 5.9,
+      "props": {
+        "text": "03 \u00b7 RESULT",
+        "x": 540,
+        "y": 820,
+        "size": 44,
+        "color": "#F6F6F5"
+      },
+      "fx": {
+        "in": {
+          "id": "fade",
+          "dur": 0.4,
+          "amount": 1
+        }
+      }
+    },
+    {
+      "id": "headline3",
+      "name": "Scene 3 headline",
+      "type": "text",
+      "start": 4.4,
+      "end": 5.9,
+      "props": {
+        "text": "Ship it.",
+        "x": 540,
+        "y": 960,
+        "size": 104,
+        "color": "#E8F27A"
+      },
+      "fx": {
+        "in": {
+          "id": "rise",
+          "dur": 0.6,
+          "amount": 1
+        }
+      }
+    }
+  ]
+}
