@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, putUpload, finishUpload, readUpload, retire, readIndex, readTemplate, readRecord, setStore, moderators, moderatorOf, slugOf, MAX_PER_DAY, MAX_ROUNDS, PASS_SCORE, IDLE_RESTART_MS } from "../src/community.js";
+import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, putUpload, finishUpload, readUpload, retire, readIndex, readTemplate, readRecord, setStore, moderators, moderatorOf, slugOf, MAX_PER_DAY, MAX_ROUNDS, PASS_SCORE, IDLE_RESTART_MS, checkCompositions } from "../src/community.js";
 import { getTemplate } from "../src/templates.js";
 import handler from "../api/community.js";
 
@@ -243,6 +243,40 @@ test("a revision can send only a patch and keep the card", async () => {
   assert.equal((await readTemplate(id, "vertical")).layers.length, before + 1);
   assert.equal((await readTemplate(id, "cuadrado")).layers.length, before);
   assert.equal((await readRecord(id)) , null, "not published yet");
+});
+test("estimated overflows warn instead of rejecting", () => {
+  const c = compositions(); c.vertical.layers[0].props.x = 1070; c.vertical.layers[0].end = 12;
+  const r = checkCompositions(c);
+  assert.deepEqual(r.errors, []);
+  assert.ok(r.warnings.some(w => w.code === "TEXT_OUTSIDE_CANVAS")); assert.ok(r.warnings.some(w => w.code === "OUTSIDE_DURATION"));
+  c.vertical.layers.push({ ...c.vertical.layers[0] });
+  assert.ok(checkCompositions(c).errors.some(e => e.code === "DUPLICATE_ID"), "real defects still reject");
+});
+test("a rejected proposal is kept as a draft and fixed with a patch", async () => {
+  setStore(mem()); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  await brief({ ...A, url }, opts); await referenceReady(id);
+  const bad = compositions(); bad.cuadrado.layers.push({ ...bad.cuadrado.layers[0] });
+  const d = await proposeTemplate({ ...A, url, compositions: bad, card }, opts);
+  assert.equal(d.accepted, false); assert.equal(d.status, "draft"); assert.ok(d.code); assert.ok(d.errors.some(e => e.code === "DUPLICATE_ID"));
+  assert.equal(jobs.filter(j => j.kind === "compare").length, 0, "a draft is not compared");
+  assert.equal((await getProposalStatus({ code: d.code }, { wait: 0 })).status, "draft");
+  const again = await proposeTemplate({ ...A, url, compositions: bad, card }, opts);
+  assert.equal(again.code, d.code, "a full send without the code continues the draft"); assert.equal(again.attempts, 2);
+  const fixed = await proposeTemplate({ ...A, url, code: d.code, patch: [{ op: "remove", path: "/layers/1", variants: ["cuadrado"] }] }, opts);
+  assert.equal(fixed.accepted, true, JSON.stringify(fixed.errors)); assert.equal(fixed.round, 1); assert.equal(fixed.code, d.code);
+  assert.equal(jobs.filter(j => j.kind === "compare").length, 1);
+});
+test("drafts stop taking sends after too many rejections, and errors are capped", async () => {
+  setStore(mem()); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  await brief({ ...A, url }, opts); await referenceReady(id);
+  const bad = compositions();
+  for (const v of ["cuadrado", "vertical", "horizontal"]) for (let i = 0; i < 10; i++) bad[v].layers.push({ ...bad[v].layers[0] });
+  let r;
+  for (let i = 0; i < 6; i++) r = await proposeTemplate({ ...A, url, compositions: bad, card }, opts);
+  assert.ok(r.errors.length <= 13); assert.equal(r.errors.at(-1).code, "MORE");
+  assert.equal((await proposeTemplate({ ...A, url, code: r.code, compositions: bad, card }, opts)).errors[0].code, "DRAFT_ATTEMPTS");
 });
 test("daily limit per caller", async () => {
   setStore(mem());
