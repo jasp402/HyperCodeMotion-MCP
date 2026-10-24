@@ -566,7 +566,7 @@ export async function finishRender(id, { ok, reason, commit, pr }, now = Date.no
 export async function readRecord(id) {
   if (!/^c-[a-z0-9-]{3,62}$/.test(id)) return null;
   const r = await getJson(`community/records/${id}.json`);
-  return r && r.official ? { id: r.id, card: r.card, source: r.source, notes: r.notes ?? "", official: r.official } : null;
+  return r && r.official ? { id: r.id, card: r.card, source: r.source, notes: r.notes ?? "", official: r.official, score: r.compare?.metrics?.score ?? null, report: r.compare?.metrics?.report ?? null } : null;
 }
 
 /** Owner: takes a template out of the gallery (its record stays, so the same video is not proposed again). */
