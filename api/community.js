@@ -29,7 +29,7 @@ async function body(req) {
  *   POST /api/community?op=ref&id=&file=     reference job uploads one frame sheet (the render workflow: GitHub OIDC)
  *   POST /api/community?op=ref-done          {id, ok, reason, duration, width, height, sheets} (the render workflow: GitHub OIDC)
  *   POST /api/community?op=compare&id=&file= compare job uploads sheet.jpg or comparacion.mp4 (the render workflow: GitHub OIDC)
- *   POST /api/community?op=compared          {id, round, ok, reason, times} (the render workflow: GitHub OIDC)
+ *   POST /api/community?op=compared          {id, round, ok, reason, times, metrics} (the render workflow: GitHub OIDC)
  *   POST /api/community?op=media&id=&file=   render job uploads one preview file (the render workflow: GitHub OIDC)
  *   POST /api/community?op=finish    {id, ok, reason, commit} render or publishing job is done (the render workflow: GitHub OIDC)
  *   POST /api/community?op=retire    {id, reason} a moderator takes a Community one out of the gallery (a moderator code)
@@ -108,7 +108,7 @@ export default async function handler(req, res) {
     if (!(await renderJob(req))) return json(res, 401, { error: "Unauthorized" });
     const r = op === "ref-done"
       ? await finishRef(String(data.id), { ok: data.ok === true, reason: data.reason, duration: data.duration, width: data.width, height: data.height, sheets: data.sheets, video: data.video })
-      : await finishCompare(String(data.id), { round: data.round, ok: data.ok === true, reason: data.reason, times: data.times });
+      : await finishCompare(String(data.id), { round: data.round, ok: data.ok === true, reason: data.reason, times: data.times, metrics: data.metrics });
     return json(res, r.ok ? 200 : 400, r);
   }
   if (op === "retire") {

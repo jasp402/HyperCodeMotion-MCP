@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, putUpload, finishUpload, readUpload, retire, readIndex, readTemplate, readRecord, setStore, moderators, moderatorOf, slugOf, MAX_PER_DAY, MAX_ROUNDS } from "../src/community.js";
+import { parseSource, readSource, getRecreationBrief, proposeTemplate, getProposalStatus, publishTemplate, finishRender, finishRef, finishCompare, putRef, putCompare, putMedia, putUpload, finishUpload, readUpload, retire, readIndex, readTemplate, readRecord, setStore, moderators, moderatorOf, slugOf, MAX_PER_DAY, MAX_ROUNDS, PASS_SCORE } from "../src/community.js";
 import { getTemplate } from "../src/templates.js";
 import handler from "../api/community.js";
 
@@ -199,6 +199,22 @@ test("a job that cannot read the video fails the brief (sources without an uploa
   await finishRef(id, { ok: false, reason: "el video respondió 403" });
   const b = await getRecreationBrief({ ...A, url }, o);
   assert.equal(b.ok, false); assert.match(b.error, /403.*compared/);
+});
+test("a low measured score answers in text, without the sheet", async () => {
+  setStore(mem()); jobs.length = 0;
+  const url = "https://prompt-motion.com/parkerrex-1a54fe", id = "c-pm-parkerrex-1a54fe";
+  await brief({ ...A, url }, opts); await referenceReady(id);
+  const r = await proposeTemplate({ ...A, url, compositions: compositions(), card }, opts);
+  await putCompare(id, "sheet.jpg", JPG);
+  const low = { score: PASS_SCORE - 20, report: "Nota baja. 2.50 s: composición distinta", pairs: [{ t: 2.5, tr: 2.5, score: 30, ssim: 0.2, color: 0.7 }] };
+  assert.equal((await finishCompare(id, { round: 1, ok: true, times: [[2.5, 2.5]], metrics: low })).ok, true);
+  const st = await getProposalStatus({ code: r.code }, { wait: 0 });
+  assert.equal(st.compare.score, PASS_SCORE - 20); assert.equal(st._images, undefined); assert.match(st.message, /2\.50 s: composición distinta/);
+  assert.equal((await proposeTemplate({ ...A, url, code: r.code, compositions: compositions(), card }, opts)).accepted, true);
+  const high = { ...low, score: PASS_SCORE + 10 };
+  await finishCompare(id, { round: 2, ok: true, times: [[2.5, 2.5]], metrics: high });
+  const ok = await getProposalStatus({ code: r.code }, { wait: 0 });
+  assert.equal(ok.compare.score, PASS_SCORE + 10); assert.equal(ok._images.length, 1);
 });
 test("daily limit per caller", async () => {
   setStore(mem());

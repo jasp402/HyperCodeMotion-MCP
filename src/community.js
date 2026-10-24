@@ -56,7 +56,14 @@ const UPLOAD_MS = 60 * 60e3;       // an upload not finished in this time is sta
 export const PART_BYTES = 3_000_000; // the original is sent in parts that fit a function's request body
 export const MAX_PARTS = 20;
 export const REF_FILES = ["general.jpg", "inicio.jpg"];
-export const COMPARE_FILES = ["sheet.jpg", "comparacion.mp4"];
+export const COMPARE_FILES = ["sheet.jpg", "diff.jpg", "comparacion.mp4"];
+/** Nota mínima (0–100, SSIM + color medidos por el job) para que Claude reciba la lámina; por debajo solo recibe el informe en texto. */
+export const PASS_SCORE = Math.max(0, Math.min(100, Number(process.env.TEMPLATE_PASS_SCORE) || 60));
+const cleanMetrics = m => {
+  if (!m || typeof m !== "object" || !num(m.score, 0, 100)) return null;
+  const pairs = Array.isArray(m.pairs) ? m.pairs.slice(0, 40).filter(p => p && num(p.t, 0, 600) && num(p.score, 0, 100)).map(p => ({ t: p.t, score: Math.round(p.score), ssim: Number(p.ssim) || 0, color: Number(p.color) || 0, pixels: Number(p.pixels) || 0 })) : [];
+  return { score: Math.round(m.score), report: String(m.report || "").slice(0, 900), pairs };
+};
 const MAX_DURATION = 45;
 const MAX_COMPOSITION_BYTES = 1.2 * 1024 * 1024;
 const RATIOS = ["1-1", "3-4", "4-3", "9-16", "16-9"];
@@ -378,9 +385,16 @@ export async function getProposalStatus(args, { wait = WAIT_MS } = {}) {
   const left = Math.max(0, Math.min(MAX_ROUNDS - r.compare.done, MAX_SUBMISSIONS - r.compare.round));
   const compare = { round: r.compare.round, ok: r.compare.ok, reason: r.compare.reason, variant: r.variant, times: r.compare.times, revisionsLeft: left };
   if (!r.compare.ok) return { ...out, compare, message: `The comparison failed: ${r.compare.reason} Fix it and send the three compositions again with propose_template and this code.` };
+  const mt = r.compare.metrics;
+  if (mt) compare.score = mt.score;
+  // filtro sin LLM: por debajo de la nota mínima no hace falta mirar la lámina, el informe dice qué corregir
+  if (mt && mt.score < PASS_SCORE && left > 0) return {
+    ...out, compare: { ...compare, passScore: PASS_SCORE, report: mt.report },
+    message: `Measured without images: score ${mt.score}/100, below ${PASS_SCORE}. ${mt.report} Fix those moments (layout, sizes, positions, colors, timing) in all three compositions and call propose_template again with this code (${left} left). The sheet is only shown once the score reaches ${PASS_SCORE}.`
+  };
   const sheet = await jpg(`community/compare/${r.id}/sheet.jpg`);
   return {
-    ...out, compare: { ...compare, how: "In the attached sheet each pair is one moment: left the original, right your recreation rendered by the Studio engine (times given as [original, recreation] in seconds; the recreation's time is scaled to its duration)." },
+    ...out, compare: { ...compare, ...(mt ? { passScore: PASS_SCORE, report: mt.report } : {}), how: "In the attached sheet each pair is one moment: left the original, right your recreation rendered by the Studio engine (times given as [original, recreation] in seconds; the recreation's time is scaled to its duration)." },
     message: `Compare every pair: layout, sizes, positions, timing, colors, typefaces and texts. If something differs, fix it in all three compositions and call propose_template again with this code (${left} left). When it truly looks like the original, call publish_template with this code and notes on what is consciously different and why.`,
     _images: sheet ? [sheet] : []
   };
@@ -501,14 +515,14 @@ export async function putCompare(id, file, bytes) {
   return { ok: true };
 }
 /** Compare job finished: Claude reviews the result. A job of an older round is ignored. */
-export async function finishCompare(id, { round, ok, reason, times: pairs }, now = Date.now()) {
+export async function finishCompare(id, { round, ok, reason, times: pairs, metrics }, now = Date.now()) {
   const r = await getJson(`community/records/${id}.json`);
   if (r?.status !== "comparing") return { ok: false, error: "Not being compared." };
   if (round !== r.compare.round) return { ok: false, error: "That round was replaced by a newer one." };
   const valid = Array.isArray(pairs) && pairs.length <= 40 && pairs.every(p => Array.isArray(p) && p.length === 2 && p.every(t => num(t, 0, 600)));
   if (ok && !valid) return { ok: false, error: "times must be the [original, recreation] pairs of the sheet." };
   r.status = "review"; r.updated = iso(now);
-  r.compare = ok ? { ...r.compare, ok: true, reason: null, times: pairs, done: r.compare.done + 1 } : { ...r.compare, ok: false, reason: String(reason || "The recreation could not be rendered.").slice(0, 300), times: null };
+  r.compare = ok ? { ...r.compare, ok: true, reason: null, times: pairs, metrics: cleanMetrics(metrics), done: r.compare.done + 1 } : { ...r.compare, ok: false, reason: String(reason || "The recreation could not be rendered.").slice(0, 300), times: null };
   await putJson(`community/records/${id}.json`, r);
   return { ok: true, status: r.status };
 }
@@ -552,7 +566,7 @@ export async function finishRender(id, { ok, reason, commit, pr }, now = Date.no
 export async function readRecord(id) {
   if (!/^c-[a-z0-9-]{3,62}$/.test(id)) return null;
   const r = await getJson(`community/records/${id}.json`);
-  return r && r.official ? { id: r.id, card: r.card, source: r.source, notes: r.notes ?? "", official: r.official } : null;
+  return r && r.official ? { id: r.id, card: r.card, source: r.source, notes: r.notes ?? "", official: r.official, score: r.compare?.metrics?.score ?? null, report: r.compare?.metrics?.report ?? null } : null;
 }
 
 /** Owner: takes a template out of the gallery (its record stays, so the same video is not proposed again). */
