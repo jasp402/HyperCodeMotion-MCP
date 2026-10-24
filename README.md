@@ -24,11 +24,71 @@ Both links expire **24 hours** after they are created. Save the project from Stu
 - *“Make a 10-second explainer with three steps for brewing pour-over coffee, 16:9, and package it for HyperCodeMotion.”*
 - *“Which layer types and effects does HyperCodeMotion support?”*
 
+## Install the skill (recommended)
+
+The connector only checks and packages a project. The **HyperCodeMotion skill** is what makes Claude ask for the canvas size, plan scenes and transitions, and follow the design guidance (typography, HTML scenes, motion, validation). A skill is a separate install: connecting the connector does **not** add it, and the connector cannot install it for you. Install both.
+
+Download: [`hypercodemotion-skill.zip`](https://github.com/jasp402/HyperCodeMotion-MCP/releases/download/skill-latest/hypercodemotion-skill.zip) (a rolling release, rebuilt from `main` by `.github/workflows/release-skill.yml`; its `SHA256SUMS` is next to it), or build it yourself from this repository (see [Build the ZIP](#build-the-zip)).
+
+### claude.ai (web) and Claude Desktop
+
+1. Turn on **Code execution and file creation** in **Settings → Capabilities** (skills need it; the setting is called *Create and edit files* in the newer layout).
+2. Open **Customize → Skills**, click **+**, then **+ Create skill**, then **Upload a skill**.
+3. Choose `hypercodemotion-skill.zip`. The skill appears in the list; make sure its toggle is on.
+4. In a new chat, turn on the HyperCodeMotion connector as well and ask for a video. Claude should ask for the canvas size first (1080×1920, 1080×1080, 1080×1350, 1920×1080 or custom).
+
+Requirements Anthropic documents for the ZIP: the skill folder is the ZIP root (`hypercodemotion/SKILL.md`, not loose files), the folder name equals the skill `name`, `description` is at most 200 characters. `npm run build:skill` checks all three.
+
+Free accounts: Anthropic's Help Center (*Use skills in Claude* and *How to create custom skills*, read on 2026-10-24) states that skills are available on Free, Pro, Max, Team and Enterprise plans, and that on Free, Pro and Max you upload your own in Customize → Skills. On Team and Enterprise an owner can disable user-created skills. Other Anthropic pages have worded the plan list differently over time; if **Customize → Skills** is missing or greyed out, code execution is off (or your organization turned skills off), which is the case the Help Center describes. We have not tried an upload on a Free account ourselves. A skill uploaded on claude.ai does not appear in the API; each surface keeps its own skills.
+
+Claude Desktop uses the same Claude account and the same **Customize → Skills** screen as claude.ai. Anthropic's article does not describe a Desktop-specific route and we did not click through the Desktop UI, so treat the steps above as the expected route there.
+
+### Claude Code
+
+Any of these puts the skill folder in `~/.claude/skills/hypercodemotion/SKILL.md`:
+
+- **One command** (verified: installs to `~/.claude/skills/hypercodemotion`; needs Node 22.20 or newer):
+
+  ```bash
+  npx skills add jasp402/HyperCodeMotion-MCP --skill hypercodemotion -a claude-code -g -y
+  ```
+
+- **By hand** (clone or download this repository):
+
+  ```bash
+  mkdir -p ~/.claude/skills
+  cp -r skills/hypercodemotion ~/.claude/skills/
+  ```
+
+  Use `.claude/skills/` inside a project to install it for that project only.
+
+- **Through your account:** Claude Code v2.1.273 or newer syncs the skills you enabled on claude.ai when you sign in with that same account (not with an API key). Run `/skills` to see them under *claude.ai sync*.
+
+Then add the connector: `claude mcp add --transport http hypercodemotion https://mcp.hypercodemotion.com/mcp`.
+
+Restart the session and run `/skills` to confirm `hypercodemotion` is listed. We did not run Claude Code itself for this document: the install paths above were checked on disk and against Anthropic's documentation. We do not ship a Claude Code plugin or marketplace manifest.
+
+### Build the ZIP
+
+```bash
+npm run build:skill        # writes dist/hypercodemotion-skill.zip (Node only, no zip binary needed)
+```
+
+The script packs `skills/hypercodemotion` with the folder as ZIP root, in a reproducible order, and fails if `SKILL.md` would be rejected (name not equal to the folder name, description over 200 characters). `npm test` rebuilds the archive and reads it back with an independent ZIP reader (every file, size and CRC-32).
+
+### What you lose with the connector alone
+
+With only the connector, Claude still validates and packages projects, but the guidance that lives in the skill is missing: no canvas-size question (it may pick a format for you), no art-direction, typography or HTML-scene guidance, no motion and transition vocabulary beyond what `get_capabilities` returns, and no checklist before delivery.
+
+To keep that loss small, `get_capabilities` returns a short `start` guide (ask the canvas size, one scene per beat joined with transitions, deliver only the links) and the transition contract (`transitions`). Claude calls it before designing, and its result is text Claude always receives. We did **not** rely on the server `instructions` string returned by `initialize`: per community reports in [anthropics/claude-ai-mcp#93](https://github.com/anthropics/claude-ai-mcp/issues/93) claude.ai does not pass it to the model (Claude Code does), and in [#1105](https://github.com/anthropics/claude-ai-mcp/issues/1105) a reporter saw custom-connector tools reach the model as bare names until a tool search. These are third-party reports, not Anthropic documentation, and we have not reproduced them ourselves.
+
+Bigger options, not implemented (each adds always-loaded tokens or needs a decision): a `get_guide(topic)` tool that returns the skill's reference pages on demand, an MCP *prompt* the user picks from the menu, or MCP *resources* for the references. See [docs/CAPABILITY-GAP-AUDIT.md](docs/CAPABILITY-GAP-AUDIT.md).
+
 ## Tools
 
 | Tool | What it does | Annotations |
 | --- | --- | --- |
-| `get_capabilities` | Lists the formats, layer types, layer properties and effect presets that Studio supports, how to reference files the user keeps in Studio (photos, logo, video clips) by id, the screen rule that decides type size, a runtime layer that keeps an existing Lottie, glTF or GSAP file and seeks it, and the Studio revision they come from. | read-only |
+| `get_capabilities` | Lists the formats, layer types, layer properties and effect presets that Studio supports, how to reference files the user keeps in Studio (photos, logo, video clips) by id, the screen rule that decides type size, a runtime layer that keeps an existing Lottie, glTF or GSAP file and seeks it, the scene transitions (`transitions`: types, `dur`, `dir`, `ease`), a short start guide (`start`) and the Studio revision they come from. | read-only |
 | `create_hcmotion` | Validates a finished composition and packages it as a `.hcmotion` file. Invalid input returns `created: false` with the errors to fix and stores nothing. Valid input returns `open` and `download` links (24 h). | write (creates a temporary file), not destructive |
 | `get_template` | Returns the full design of a Studio gallery template by its id and format (brief, scenes, HTML scene documents and layers), to use as a design reference. | read-only |
 | `validate_json` | Checks a composition, design or improvement patch and returns errors and warnings. Rejects measurable text that cannot fit the canvas and line-height below 1. It does not prove a correct render. | read-only |
@@ -91,6 +151,7 @@ Files are served at `https://mcp.hypercodemotion.com/d/<id>` and open in Studio 
 ```bash
 npm test          # unit and integration tests
 npm run test:live # smoke test against production
+npm run build:skill # builds dist/hypercodemotion-skill.zip
 ```
 
 GitHub Actions runs both. Neither guarantees full Studio rendering compatibility.
@@ -101,7 +162,7 @@ The catalog is derived from Studio source files (`packages/core/src/schema.ts`, 
 
 ### HyperCodeMotion Creative Skill
 
-The repository also contains the [HyperCodeMotion Agent Skill](skills/hypercodemotion/SKILL.md), which guides AI assistants from brief to art direction, scenes, editable JSON and the `.hcmotion` handoff. It is distributed separately from the connector and does not activate just because the connector is connected.
+The repository also contains the [HyperCodeMotion Agent Skill](skills/hypercodemotion/SKILL.md), which guides AI assistants from brief to art direction, scenes, editable JSON and the `.hcmotion` handoff. It is distributed separately from the connector and does not activate just because the connector is connected: see [Install the skill](#install-the-skill-recommended). `validate_json` also warns about scene and transition mistakes (`SCENE*` and `TRANSITION_*` codes: unknown type, first scene, missing `dur`, overlap).
 
 ## License
 

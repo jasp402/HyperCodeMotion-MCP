@@ -34,6 +34,29 @@ A layer has at most one effect per slot: `"fx": {"in": FxRef, "out": FxRef, "loo
 
 An `out` preset is the same movement as its entrance, played backwards. Type limits from `presets.ts`: `wipe` only on `image`, `video` and `html`; `type`, `letters` and `words` only on `text`; `draw` only on `rect`, `ellipse`, `polygon` and `svg`; `outline` and `neon` only on `text`, `rect`, `ellipse` and `polygon`. On another type Studio ignores the effect.
 
+## Scene transitions
+
+Studio plays a transition when one scene hands over to the next. Declare `scenes` at the composition root (consecutive, never overlapping) and put a `transition` on every scene after the first:
+
+```json
+"scenes": [
+  {"id": "s1", "name": "Problem", "start": 0, "end": 2},
+  {"id": "s2", "name": "Idea",    "start": 2, "end": 4, "transition": {"type": "push", "dur": 0.6, "dir": "right", "ease": "easeInOutCubic"}},
+  {"id": "s3", "name": "Result",  "start": 4, "end": 6, "transition": {"type": "zoom", "dur": 0.5}}
+]
+```
+
+Full working file: [scene-transitions.json](../examples/scene-transitions.json). From Studio `types.ts` and `render.ts`:
+
+- `type`: `fade` (cross-dissolve), `slide` (new scene slides over the old one), `push` (new scene pushes the old one out), `wipe` (reveal edge), `clockWipe` (clockwise sweep from 12 o'clock), `iris` (circle opens from the centre), `zoom` (old scene grows and fades, new one settles in from 85%), `flip` (card flip: old scene squashes to a line, the new one opens), `blur` (cross-dissolve through a blur). An unknown `type` is a hard cut.
+- `dur`: seconds, above 0 (typically 0.4–0.8, never longer than the scene). Studio ignores the transition when `dur` is 0 or missing.
+- `dir`: `left`, `right`, `up` or `down` = the side the new scene enters **from**; used by `slide`, `push`, `wipe` and `flip` (flip uses only the axis). Default `right`. Leave it out for `fade`, `clockWipe`, `iris`, `zoom` and `blur`. An invalid value does not fall back to the default: `slide` stops moving and `wipe` runs top-down.
+- `ease`: any name from the list above; default `easeInOutCubic`.
+- It is an **entry** transition played at the new scene's `start`, so it belongs to the scene that arrives. It is ignored on the first scene. The outgoing scene stays frozen on its last frame during the transition: finish its motion before the cut.
+- Layers that belong to no scene (fixed layers under or over everything) are drawn outside the transition. Without them the scenes are composited opaque over `background`, so give each scene its own background layer or palette change.
+
+Choose by meaning: `push` and `slide` for sequence or progress, `zoom` and `iris` to enter a detail, `fade` and `blur` for a calm change of topic, `wipe` for a reveal, `flip` for before and after. Vary them across the video, but keep one family so the edit feels designed. The MCP `validate_json` warns about the mistakes above (`TRANSITION_*` and `SCENE*` codes) but does not render: it cannot tell you the transition looks good.
+
 ## Keyframes
 
 Use global-second `kf` for physical changes and exact timing. Each keyframe's `ease` is the curve **towards the next** keyframe (the last keyframe's `ease` is unused). Valid names, from Studio `easing.ts`:

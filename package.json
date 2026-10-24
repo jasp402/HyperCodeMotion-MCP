@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "test:live": "node scripts/smoke.mjs"
+    "test:live": "node scripts/smoke.mjs",
+    "build:skill": "node scripts/build-skill-zip.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2"

@@ -1,6 +1,6 @@
 ---
 name: hypercodemotion
-description: Create and edit motion graphics videos (launch promos, explainers, social reels, animated titles) as editable HyperCodeMotion projects. Asks the canvas size first, then guides art direction, scenes, motion and assets, and delivers a .hcmotion file through the HyperCodeMotion MCP.
+description: Create motion graphics videos (promos, explainers, reels, titles) as editable HyperCodeMotion projects: asks canvas size, directs scenes and motion, delivers a .hcmotion via the HyperCodeMotion MCP.
 ---
 
 # HyperCodeMotion — Creative Composition Skill
@@ -20,7 +20,7 @@ Use this Skill when asked to create, improve, extend, combine, or troubleshoot e
    Accept a platform name as the answer («para Reels» means 9:16). Ask this together with any other blocking question, never as a second round. Use the chosen `width` and `height` everywhere: type sizes, margins and the safe area depend on it (see [composition.md](references/composition.md)). Never switch to another format later without asking. Do not ask when the size is already known: an existing project keeps its own `width` and `height`, a prompt copied from Studio states its format, and a gallery recreation follows its brief.
 2. **Brief and inputs** — Identify purpose, audience, distribution format, duration, fps, language, brand, CTA (only when requested), narration and exact data. Analyze user-provided reference images/video, scripts, logos, visual assets and any existing JSON. Distinguish factual content from creative decisions. Ask only for information that blocks progress.
 3. **Art direction** — Define visual concept, typography hierarchy, spacing grid, palette, contrast, material, rhythm, transition vocabulary and continuity. Reuse the actual reference's visual intent; do not invent a brand or factual measurements. When the request names a Studio gallery template (an id such as `mix-promo-editorial`), call `get_template` with that id and the video's format, and follow its design: palette, fonts, frame, scene system and motion; replace all its texts.
-4. **Storyboard and scenes** — Create sequential beats with one communicative objective each. Decide which objects persist and transform between beats versus which appear only within one scene. Allocate time to reading and transitions; storyboard timing must fit total duration.
+4. **Storyboard and scenes** — Create sequential beats with one communicative objective each. Decide which objects persist and transform between beats versus which appear only within one scene. Allocate time to reading and transitions; storyboard timing must fit total duration. Join the beats with Studio scene transitions (`scenes[i].transition`: `fade`, `slide`, `push`, `wipe`, `clockWipe`, `iris`, `zoom`, `flip`, `blur`; exact shape in [motion-design](references/motion-design.md#scene-transitions)).
 5. **Composition plan** — Default to **HTML scenes**: one HTML document per scene in `docs`, each visible piece marked `data-hcm` and animated by its own `html` layer (see [html-scenes](references/html-scenes.md) and [the example](examples/html-scene-launch.json)). Use native layers (`text`, `rect`, `particles`…) when a piece must be edited as geometry or needs per-property keyframes. Plan layer IDs, order, scene boundaries, assets, effects and audio.
 6. **JSON generation** — Produce **one complete, standalone composition** with `layers` at the root. To change an existing project, return the whole updated composition (keep unchanged layers, IDs and assets as they were), not a patch: a `.hcmotion` file can only carry a full composition.
 7. **MCP validation** — The HyperCodeMotion MCP (`https://mcp.hypercodemotion.com/mcp`) is required. Call `get_capabilities` before selecting layer/effect fields; `validate_json` is optional for drafts. **Do not claim validation if no call occurred.**
@@ -43,7 +43,7 @@ Load only the applicable reference files instead of pasting all reference conten
 ## Creative acceptance criteria
 
 - Clear narrative and design hierarchy; readable at target size.
-- Deliberate transitions; motion supports meaning rather than decorating every element.
+- Deliberate transitions: a `scenes` array with a `transition` on every scene after the first, varied by meaning rather than one effect everywhere; motion supports meaning rather than decorating every element.
 - Consistent colors, type, spacing and asset treatment across scenes.
 - No overlaps, cropped labels, flicker, unintentional empty frames or jumps in continuity (visually verify in Studio; do not assert without rendering). Type size yields to the canvas: see [composition.md](references/composition.md).
 - Headlines read as separate words: keep letter-spacing at or above `-0.03em` for big type (tighter makes «Escribe menos» look like one word).
