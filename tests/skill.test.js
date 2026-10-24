@@ -7,6 +7,13 @@ test("Skill manifest has valid name and description",()=>{
  const s=readFileSync(root+"SKILL.md","utf8");
  assert.match(s,/^---\nname: hypercodemotion\ndescription: .+\n---/);
  assert.ok(s.includes("MCP validation"));
+ assert.match(s,/\.hcmotion/);
+});
+test("Skill asks for the canvas size before designing",()=>{
+ const s=readFileSync(root+"SKILL.md","utf8");
+ const first=s.indexOf("1. **Canvas size first**");
+ assert.ok(first>0&&first<s.indexOf("2. **Brief"));
+ for(const size of ["1080×1920","1080×1080","1080×1350","1080×1440","1920×1080"])assert.ok(s.includes(size),size);
 });
 test("Skill references exist",()=>{
  for(const name of ["composition","visual-design","motion-design","html-scenes","validation"])

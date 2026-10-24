@@ -38,7 +38,7 @@ This is an illustrative sample for this 1080×1920 canvas, not evidence of a suc
 
 ## Type size follows the screen
 
-Decide `width` and `height` before any type size. `get_capabilities` returns the rule and the numbers in `screen` (the same figures Studio calls PANTALLA). Fit the words inside that safe area: lower the size or wrap lines when they do not fit. `line-height` is at least 1, so the box wraps the glyphs instead of cropping them. The canvas crops whatever still falls outside the frame. `validate_json` rejects measurable text that does not fit, text that crosses the canvas, and `line-height` below 1. It warns when text sits in the margin. It still does not render the picture (`fullyValidated` stays false).
+Decide `width` and `height` before any type size. `get_capabilities` returns the rule and the numbers in `screen` (the same figures Studio calls PANTALLA). The starting sizes in `screen` (title, support, label) are a starting point, neither a minimum nor a maximum: a bigger, disruptive headline is fine when it still fits the safe area. Fit the words inside that safe area: lower the size or wrap lines when they do not fit. `line-height` is at least 1, so the box wraps the glyphs instead of cropping them. The canvas crops whatever still falls outside the frame. `validate_json` rejects measurable text that does not fit, text that crosses the canvas, and `line-height` below 1. It warns when text sits in the margin. It still does not render the picture (`fullyValidated` stays false).
 
 ## Layers and timing
 
