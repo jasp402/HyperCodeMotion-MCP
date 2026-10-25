@@ -89,6 +89,7 @@ Bigger options, not implemented (each adds always-loaded tokens or needs a decis
 | Tool | What it does | Annotations |
 | --- | --- | --- |
 | `get_capabilities` | Lists the formats, layer types, layer properties and effect presets that Studio supports, how to reference files the user keeps in Studio (photos, logo, video clips) by id, the screen rule that decides type size, a runtime layer that keeps an existing Lottie, glTF or GSAP file and seeks it, the scene transitions (`transitions`: types, `dur`, `dir`, `ease`), a short start guide (`start`) and the Studio revision they come from. | read-only |
+| `get_motion_recipe` | On demand: real, validated JSON/HTML/CSS patterns for looks the basics do not give. Without `name` it returns the index; with one, a recipe: `riso` (print, overprint, grain), `choreography` (keyframes, springs, easings), `audio`, `camera`, `code-texture`, `ui-mockup` (the 11 `ui` kinds), `scene-bg` (a background per scene), `looks` (the 13 looks in one table) and `look:<id>` (one look in full). Plain text result; it stores nothing. | read-only |
 | `create_hcmotion` | Validates a finished composition and packages it as a `.hcmotion` file. Invalid input returns `created: false` with the errors to fix and stores nothing. Valid input returns `open` and `download` links (24 h). | write (creates a temporary file), not destructive |
 | `get_template` | Returns the full design of a Studio gallery template by its id and format (brief, scenes, HTML scene documents and layers), to use as a design reference. | read-only |
 | `validate_json` | Checks a composition, design or improvement patch and returns errors and warnings. Rejects measurable text that cannot fit the canvas and line-height below 1. It does not prove a correct render. | read-only |
@@ -101,7 +102,7 @@ The recreation itself happens in the user's own Claude conversation; the connect
 
 ## Data and privacy
 
-- `get_capabilities`, `get_template`, `validate_json` and `get_proposal_status` store nothing.
+- `get_capabilities`, `get_motion_recipe`, `get_template`, `validate_json` and `get_proposal_status` store nothing.
 - `get_recreation_brief` stores reference frames of the public source video in the private store (never published), so the recreation can be compared with it.
 - `propose_template` stores the proposal, its card and its source link (no personal data) until a moderator publishes it, which commits it to the Studio code. A salted hash of the moderator's name is kept for one day to limit proposals to 20 a day per moderator.
 - `create_hcmotion` stores the generated file in a private Vercel Blob store. Anyone with the link can download it until it expires after 24 hours; a daily job deletes expired files (at most about 48 hours after creation).
@@ -155,6 +156,12 @@ npm run build:skill # builds dist/hypercodemotion-skill.zip
 ```
 
 GitHub Actions runs both. Neither guarantees full Studio rendering compatibility.
+
+### Motion recipes and self-review
+
+`src/recipes.js` builds every recipe from a composition fragment (`layers`, `docs`, `scenes`, `audio`); the text a model reads is generated from that same fragment, and `tests/recipes.test.js` runs each one through `validateJson` and `checkComposition` (no error and no warning other than `CONTRACT_NOT_CHECKED`). `src/looks.js` holds the 13 looks and their deco code, copied from Studio `packages/core/src/looks.ts` (contract `c75a0b3`); refresh it when the Studio looks change. Nothing in a recipe is part of the fixed tool/instruction load: only its on-demand result.
+
+`validate_json` (and `create_hcmotion` when it creates the file) returns a short `checklist` for compositions that are valid; it is never sent next to errors. New warnings: `TEXT_OVERLAP` (two different static texts on the same spot at the same time; echoes, rotated or animated blocks are exempt), `UNKNOWN_EASE` (keyframe `ease`, keyframe `spring` mode and `animEase` names Studio would silently replace) and `TEXT_FIT_UNEVALUATED` (text that is an expression). Keyframed `text` is now measured on every value instead of its default (the old `TEXT_DOES_NOT_FIT` false positive).
 
 ### Capabilities snapshot
 

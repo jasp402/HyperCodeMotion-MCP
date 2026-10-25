@@ -135,3 +135,22 @@ Cheap mitigation regardless: a weight rule in `html-scenes.md` (few font familie
 
 Verified by running code in this PR: `npm test` (103 tests); the transition example passes `validateJson` with no `UNKNOWN_*`/`TRANSITION_*` warning and is accepted by the **live** `validate_json`; the encoded `.hcmotion` round-trips through the Studio's own `decodeHcmotion` + `checkComposition` (no errors) and `transitionAt` returns the expected scene, type and progress at t = 2.0, 2.3, 4.0, 4.25 (run with `tsx` from a scratch folder; Studio not modified); the skill ZIP passes Python `zipfile.testzip()`, `unzip -t` and an independent reader in `tests/skill-zip.test.js`; `npx skills add … -a claude-code -g -y` installs to `~/.claude/skills/hypercodemotion`.
 Not verified: that the claude.ai Skills upload accepts the ZIP on a Free account (the Help Center says Free is supported; I did not upload); the Claude Desktop UI; Claude Code itself loading the skill; that claude.ai drops `instructions` and defers connector tools (third-party issue reports); how the new transitions *look* in Studio (code-level acceptance only, no browser); H1 and H2 above.
+
+## 8. Implementation status (branch `feat/motion-recipes`)
+
+Closed with one tool, no new connector or endpoint, and no change to the four publishing tools:
+
+| Gap | What shipped | Where |
+| --- | --- | --- |
+| G2 UI motion | Recipe `ui-mockup`: the 11 `ui` kinds with their props, the `forma` morph pattern, swap timings, cursor | `src/recipes.js` |
+| G3 13 looks | `looks` (one table) and `look:<id>` ×13: palette, fonts, shape, motion, rule and a working layer set ported from Studio `lookSample` | `src/looks.js`, `src/recipes.js` |
+| G4 Camera | Recipe `camera`: x/y/zoom/shake keyframes, depth parallax, `follow`/`fill`/`lag`, fixed HUD | `src/recipes.js` |
+| G5 Text animation | Recipe `choreography`: `anim` chars/words/lines, `stagger`, `animEase`, `copies` repeaters, `hold` text swaps | `src/recipes.js` |
+| G6 Audio | Recipe `audio`: real schema (profile, density, tracks, sfx, sound and synth ids, Tidal grammar), checked with Studio `normalizeAudio` (no warnings). `get_template` still strips `audio` (not changed here) | `src/recipes.js` |
+| G9 Easings | `UNKNOWN_EASE` for keyframe `ease`, keyframe `spring` and `animEase`; 0 hits over the 39 gallery templates | `src/easing.js` |
+| G10 Code layers | Recipe `code-texture`: scope, helpers and three deco snippets. `cursor` appears in `ui-mockup`; `particles`, `svg`, `component` are still names only | `src/recipes.js` |
+| G12 Validator | `TEXT_OVERLAP`, `UNKNOWN_EASE`, `TEXT_FIT_UNEVALUATED`, kf-text fit fix, review `checklist` on valid compositions. Camera and audio shape checks remain unchecked | `src/textfit.js`, `src/contract.js` |
+| Riso / overprint | Recipe `riso`: multiply inks, misregistration, halftone, stripes, fixed grain layer | `src/recipes.js` |
+| Per-scene background | Recipe `scene-bg`: full-canvas rect per scene vs a fixed first layer | `src/recipes.js` |
+
+Measured (tiktoken `cl100k_base`, an estimate: Claude's tokenizer counts somewhat higher): fixed load (tool descriptions and schemas + `initialize.instructions` + SKILL.md header) 3706 → 3844 tokens (+138, ceiling +150). Everything else is on demand: index 239; recipes 540-1240 each (`riso` is the largest because it carries two HTML documents); `looks` 836; `look:<id>` 640-950; checklist 173 on each valid result.

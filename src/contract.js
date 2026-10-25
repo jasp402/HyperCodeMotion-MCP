@@ -2,12 +2,26 @@ import contract from "./studio-contract.json" with { type: "json" };
 import { validateComposition } from "./validator.js";
 import { screenRule } from "./frame.js";
 import { TRANSITIONS, checkScenes } from "./transitions.js";
+import { checkEases } from "./easing.js";
 
 /** The user's own files («Tus materiales» in Studio): referenced by id, never uploaded here. */
 const USER_MATERIALS = "Files the user listed by id in their request (photos, cut-outs, a logo, videos) stay in Studio and are filled in by id when the project opens. Reference them with props.asset = <id>: an image as an \"image\" layer (or <img src=\"asset:<id>\"> in an HTML scene), a video as a \"video\" layer whose props.from is the second of the file where the shown clip starts; the clip lasts end - start and plays without sound. Do not put them in \"assets\" or as URLs, and use only ids the user gave.";
 
 /** Where the connector-only user (no Skill installed) gets the essentials: claude.ai does not show `initialize.instructions`, but it does show tool results. */
-const START = "Before designing, ask the user once for the canvas size unless they gave it: 9:16 1080x1920, 1:1 1080x1080, 4:5 1080x1350, 16:9 1920x1080 (or custom). Build one scene per beat in scenes[] and join them with transitions. Deliver only the open and download links from create_hcmotion, never the JSON.";
+const START = "Before designing, ask the user once for the canvas size unless they gave it: 9:16 1080x1920, 1:1 1080x1080, 4:5 1080x1350, 16:9 1920x1080 (or custom). Build one scene per beat in scenes[] and join them with transitions. Deliver only the open and download links from create_hcmotion, never the JSON. For a look the basics do not give (riso print, springs, camera, audio, UI mockups, per-scene backgrounds, 13 style looks) call get_motion_recipe first.";
+
+/** Self-review the model reads once a composition is valid (not on errors, where the fixes are what matter). */
+export const CHECKLIST = [
+  "Review before delivering:",
+  "1. One focal point per scene; no text over text (TEXT_OVERLAP).",
+  "2. Own background per scene, or one fixed background.",
+  "3. 3+ different easings/fx; springs for UI/camera; real ease names.",
+  "4. Not flat: texture/deco layer or a defined look.",
+  "5. Audio: profile, density, bpm, sfx on cuts and hits.",
+  "6. Hold the last frame 1 s+; no dead time over 1.5 s.",
+  "7. Max 2 font families; readable contrast.",
+  "8. Keep a warning only if it is a conscious choice.",
+];
 
 /** Properties every drawable layer type shares. Listed once instead of once per type (13 copies of 15 names). */
 const COMMON = ["x","y","scale","scaleX","scaleY","rotation","opacity","depth","rotateX","rotateY","perspective","glow","glowColor","blur","blend"];
@@ -52,5 +66,8 @@ export function validateJson(input, options = {}) {
   if (report.format === "composition") notices.push(...checkScenes(input));
   if (report.format === "improvement" && Array.isArray(input.add))
     input.add.forEach((v,i)=>check(v,"$.add["+i+"]"));
-  return {...report,contractVersion:"studio-snapshot-1",warnings:[...report.warnings,...notices]};
+  const easeWarnings = report.format === "composition" || report.format === "improvement" ? checkEases(input) : [];
+  const out = {...report,contractVersion:"studio-snapshot-1",warnings:[...report.warnings,...notices,...easeWarnings]};
+  if (report.valid && report.format === "composition") out.checklist = CHECKLIST;
+  return out;
 }
