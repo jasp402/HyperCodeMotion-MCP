@@ -142,7 +142,7 @@ const codeTexture = {
 const uiMockup = {
   summary: "UI mockups: one morphing shape plus the 11 ui kinds, springs and swap transitions.",
   notes: [
-    "ONE rect \"forma\" lasts the whole video; states change its w, h, radius, fill with spring kf (ui | snappy | smooth | soft; never easeOutBack/elastic). Each state is a child ui layer: parent \"forma\", x 0, y 0, NO w/h. Swap: outgoing ends 0.12 s after the change with fx.out swap 0.12; incoming starts 0.03 s after with fx.in swap 0.22.",
+    "A ui layer draws only its content, no background: always put a rect behind it. ONE rect \"forma\" lasts the whole video; states change its w, h, radius, fill with spring kf (ui | snappy | smooth | soft; never easeOutBack/elastic). Each state is a child ui layer: parent \"forma\", x 0, y 0, NO w/h. Swap: outgoing ends 0.12 s after the change with fx.out swap 0.12; incoming starts 0.03 s after with fx.in swap 0.22.",
     "ui props by kind | label: text, icon (Lucide), size, weight | spinner | check | island: text, sub, icon, on | player: text, sub, total (s), on 0-1, value 0-1 | slider: value 0-1 (>1 stretches) | toggle: on 0-1 | tabs: items \"A|B|C\", index | chart: data \"12,18,15\", items \"A|B\", text, sub, prefix, hover (-1 hides) | palette: text, typed (linear kf), items, index, enter 0-1 | toast: text, sub, icon.",
     "Colours: color, accent (active fill), knob. Font Geist. on/index/value/hover also take spring kf. Cursor layer last: x/y spring smooth, down 0/1 snappy; click 0.3 s before each change.",
   ],
