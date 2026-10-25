@@ -95,3 +95,56 @@ test("get_capabilities carries the screen rule", () => {
   assert.match(screen, /canvas format decides type size/);
   assert.equal(getCapabilities().fullyValidated, false);
 });
+
+// ---- self-review: kf text, overlap, easing names ----
+const kfText = (v) => ({ kf: v.map((s, i) => ({ t: i, v: s })) });
+
+test("keyframed text is measured over every value, not its default", () => {
+  const short = validateComposition(base({ layers: [text({ text: kfText(["3", "2", "1", "GO"]), x: 540, y: 960, size: 150 })] }));
+  assert.equal(short.valid, true, JSON.stringify(short.errors));
+  const long = validateComposition(base({ layers: [text({ text: kfText(["Hi", "Your model is ready."]), x: 540, y: 960, size: 150 })] }));
+  assert.ok(codes(long).includes("TEXT_DOES_NOT_FIT"));
+});
+
+test("text that is an expression is reported as not measured, not as a fit error", () => {
+  const r = validateComposition(base({ layers: [text({ text: { expr: "'N ' + Math.floor(t)" }, x: 540, y: 960, size: 150 })] }));
+  assert.equal(r.valid, true);
+  assert.ok(r.warnings.some((w) => w.code === "TEXT_FIT_UNEVALUATED"));
+});
+
+const named = (id, props, extra = {}) => ({ id, name: id, type: "text", start: 0, end: 4, props, ...extra });
+const overlaps = (r) => r.warnings.filter((w) => w.code === "TEXT_OVERLAP");
+
+test("two different texts on the same spot at the same time warn TEXT_OVERLAP", () => {
+  const r = validateComposition(base({ layers: [named("a", { text: "Launch day", x: 540, y: 900, size: 100 }), named("b", { text: "Pisco Sour", x: 560, y: 920, size: 100 })] }));
+  assert.equal(overlaps(r).length, 1);
+});
+
+test("no TEXT_OVERLAP for separate positions, separate times, echoes or rotated stamps", () => {
+  const apart = validateComposition(base({ layers: [named("a", { text: "One", x: 540, y: 500, size: 100 }), named("b", { text: "Two", x: 540, y: 1100, size: 100 })] }));
+  assert.equal(overlaps(apart).length, 0);
+  const later = validateComposition(base({ layers: [named("a", { text: "One", x: 540, y: 900, size: 100 }, { end: 2 }), named("b", { text: "Two", x: 540, y: 900, size: 100 }, { start: 2 })] }));
+  assert.equal(overlaps(later).length, 0);
+  const echo = validateComposition(base({ layers: [named("a", { text: "Same", x: 540, y: 900, size: 100 }), named("b", { text: "Same", x: 548, y: 908, size: 100 })] }));
+  assert.equal(overlaps(echo).length, 0);
+  const stamp = validateComposition(base({ layers: [named("a", { text: "One", x: 540, y: 900, size: 100 }), named("b", { text: "Two", x: 540, y: 900, size: 100, rotation: -8 })] }));
+  assert.equal(overlaps(stamp).length, 0);
+});
+
+test("html text pieces that sit on top of each other warn TEXT_OVERLAP", () => {
+  const piece = (name, top, label) => `<div class="p" style="left:calc(50% + 0px);top:calc(50% + ${top}px);transform:translate(-50%,-50%);font-size:90px" data-hcm="${name}">${label}</div>`;
+  const doc = (a, b) => `<!doctype html><html><head><style>.p{position:absolute;width:max-content;line-height:1}</style></head><body>${piece("a", a, "Hello world")}${piece("b", b, "Other words")}</body></html>`;
+  const mk = (d) => base({ docs: { s: d }, layers: [{ id: "a", type: "html", start: 0, end: 4, props: { doc: "s", part: "a" } }, { id: "b", type: "html", start: 0, end: 4, props: { doc: "s", part: "b" } }] });
+  assert.equal(overlaps(validateComposition(mk(doc(0, 10)))).length, 1);
+  assert.equal(overlaps(validateComposition(mk(doc(-300, 300)))).length, 0);
+});
+
+test("UNKNOWN_EASE warns for invented keyframe easings, spring modes and animEase; real names pass", () => {
+  const mk = (props) => base({ layers: [{ id: "r", type: "rect", start: 0, end: 4, props: { x: 540, y: 960, w: 100, h: 100, fill: "#fff", ...props } }] });
+  const bad = validateJson(mk({ x: { kf: [{ t: 0, v: 0, ease: "easeOutSuperBounce" }, { t: 1, v: 9 }] }, y: { kf: [{ t: 0, v: 0 }, { t: 1, v: 9 }], spring: "wobbly" } }));
+  assert.equal(bad.warnings.filter((w) => w.code === "UNKNOWN_EASE").length, 2);
+  const good = validateJson(mk({ x: { kf: [{ t: 0, v: 0, ease: "easeOutExpo" }, { t: 1, v: 9, ease: "spring(27,380,1)" }, { t: 2, v: 3, ease: "cubic-bezier(.2,.8,.2,1)" }] }, y: { kf: [{ t: 0, v: 0 }, { t: 1, v: 9 }], spring: "snappy" } }));
+  assert.equal(good.warnings.filter((w) => w.code === "UNKNOWN_EASE").length, 0);
+  const anim = validateJson(base({ layers: [text({ text: "Hi", x: 540, y: 960, size: 100, animEase: "easeBouncy" })] }));
+  assert.equal(anim.warnings.filter((w) => w.code === "UNKNOWN_EASE").length, 1);
+});

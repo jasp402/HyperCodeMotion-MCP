@@ -23,6 +23,21 @@ function series(value) {
   return { values: [], expr: false, missing: true };
 }
 
+/**
+ * The strings a text prop can show: a plain string, or every string value of its keyframes
+ * (a counter or a text that changes over time). null when it is an expression (unmeasurable).
+ * @returns {string[] | null}
+ */
+function textVariants(value) {
+  if (typeof value === "string") return [value];
+  if (obj(value) && Array.isArray(value.kf)) {
+    const found = value.kf.map((k) => (k && (typeof k.v === "string" || finite(k.v)) ? String(k.v) : null)).filter((v) => v !== null);
+    return found.length ? found : [DEFAULTS.text];
+  }
+  if (obj(value) && typeof value.expr === "string") return null;
+  return [DEFAULTS.text];
+}
+
 function widestFactor(line) {
   const letters = [...line].filter((c) => c.toLowerCase() !== c.toUpperCase());
   const upper = letters.filter((c) => c === c.toUpperCase()).length;
@@ -62,6 +77,7 @@ export function textFitIssues(input, composition) {
       if (obj(layer) && layer.type === "text") checkText(layer, `$.layers[${i}]`, input.width, input.height, fail, warn);
     });
     checkDocs(input.docs, input.width, input.height, fail, warn);
+    overlapIssues(input, warn);
     return { errors, warnings };
   }
 
@@ -106,14 +122,19 @@ function checkText(layer, path, W, H, fail, warn) {
   if (lineHeight < 1) {
     fail(`${path}.props.lineHeight`, "TEXT_LINE_HEIGHT", `lineHeight ${lineHeight} is below 1, so the box is shorter than the glyphs and crops them. Use at least 1.`);
   }
-  const text = typeof props.text === "string" ? props.text : DEFAULTS.text;
+  // text may carry keyframes (a counter, swapped words): measure the biggest value it takes, not the default text
+  const variants = textVariants(props.text);
+  if (variants === null) {
+    warn(`${path}.props`, "TEXT_FIT_UNEVALUATED", "text is an expression, so fit was not measured.");
+    return;
+  }
   const trackingSeries = series(props.tracking);
   const tracking = trackingSeries.values.length ? Math.max(...trackingSeries.values) : DEFAULTS.tracking;
   const scale = axis(props.scale, DEFAULTS.scale) * axis(props.scaleX, 1);
   const scaleY = axis(props.scale, DEFAULTS.scale) * axis(props.scaleY, 1);
-  const block = blockSize(text, size, Math.max(lineHeight, 1), tracking);
-  const boxW = block.w * scale;
-  const boxH = block.h * scaleY;
+  const blocks = variants.map((text) => blockSize(text, size, Math.max(lineHeight, 1), tracking));
+  const boxW = Math.max(...blocks.map((b) => b.w)) * scale;
+  const boxH = Math.max(...blocks.map((b) => b.h)) * scaleY;
   if (boxW > frame.safeW + 1 || boxH > frame.safeH + 1) {
     fail(`${path}.props`, "TEXT_DOES_NOT_FIT", `This text is about ${Math.ceil(boxW)}×${Math.ceil(boxH)} px. The ${frame.name} safe area is ${frame.safeW}×${frame.safeH} px (canvas ${W}×${H}; starting title ${frame.title} px, not a minimum). Lower size or wrap lines with \\n. The screen wins over a requested size.`);
   }
@@ -289,10 +310,29 @@ function styleFor(piece, rules) {
     }
     const height = pxOf(body, "height");
     if (height != null) style.height = height;
+    centerOf(body, style);
   };
   for (const rule of rules) if (matches(rule.selector, piece)) apply(rule.body);
   apply(piece.inline);
   return style;
+}
+
+/**
+ * Where a piece centred with `left/top: <n>% | calc(50% ± Npx)` + `transform: translate(-50%,-50%)` sits, as a
+ * share of the canvas plus a px offset. Used only for the overlap check; the fit checks above ignore it.
+ */
+function centerOf(body, style) {
+  if (!/translate\(\s*-50%\s*,\s*-50%\s*\)/i.test(body) && style.centered !== true) return;
+  const axis = (name) => {
+    const m = new RegExp(`(?:^|[;{\\s])${name}\\s*:\\s*(?:calc\\(\\s*(\\d+(?:\\.\\d+)?)%\\s*(?:([+-])\\s*(\\d+(?:\\.\\d+)?)px)?\\s*\\)|(\\d+(?:\\.\\d+)?)%)`, "i").exec(body);
+    if (!m) return null;
+    if (m[4] !== undefined) return { share: Number(m[4]) / 100, px: 0 };
+    return { share: Number(m[1]) / 100, px: m[3] ? (m[2] === "-" ? -1 : 1) * Number(m[3]) : 0 };
+  };
+  if (/translate\(\s*-50%\s*,\s*-50%\s*\)/i.test(body)) style.centered = true;
+  const x = axis("left"), y = axis("top");
+  if (x) { style.centerX = x.share; style.centerPx = x.px; }
+  if (y) { style.centerY = y.share; style.centerPy = y.px; }
 }
 
 function fontSizePx(body) {
@@ -327,4 +367,105 @@ function visibleText(inner) {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
     .trim();
+}
+
+// ---------- overlap between text blocks ----------
+
+const OVERLAP_MIN_SECONDS = 0.25;
+const OVERLAP_MIN_SHARE = 0.3;
+
+/** A number that never changes over time: a plain number, or a keyframe prop whose values are all equal. null when it moves or is an expression. */
+function steady(value, fallback) {
+  if (value === undefined) return fallback;
+  const s = series(value);
+  if (s.expr || s.missing) return null;
+  return s.values.every((v) => v === s.values[0]) ? s.values[0] : null;
+}
+
+/** Blocks whose position, size and text are known and fixed: native text layers and html text pieces. */
+function measurableBlocks(input) {
+  const W = input.width;
+  const H = input.height;
+  const end = finite(input.duration) ? input.duration : Infinity;
+  const blocks = [];
+  const window = (layer) => [finite(layer.start) ? layer.start : 0, finite(layer.end) ? Math.min(layer.end, end) : end];
+  input.layers.forEach((layer, i) => {
+    if (!obj(layer) || layer.hidden === true || !obj(layer.props) || typeof layer.parent === "string") return;
+    const props = layer.props;
+    if (layer.type === "text") {
+      if (typeof props.text !== "string" || !props.text.trim()) return;
+      const x = steady(props.x, DEFAULTS.x), y = steady(props.y, DEFAULTS.y);
+      const size = steady(props.size, DEFAULTS.size), lh = steady(props.lineHeight, DEFAULTS.lineHeight);
+      const tracking = steady(props.tracking, 0), sc = steady(props.scale, 1), scx = steady(props.scaleX, 1), scy = steady(props.scaleY, 1);
+      const opacity = steady(props.opacity, 1);
+      // a rotated box is not axis-aligned: left alone
+      if (steady(props.rotation, 0) !== 0) return;
+      if ([x, y, size, lh, tracking, sc, scx, scy, opacity].some((v) => v === null) || !(size > 0) || opacity <= 0.05) return;
+      if (finite(props.copies) && props.copies > 1) return;
+      const b = blockSize(props.text, size, Math.max(lh, 1), tracking);
+      const w = b.w * sc * scx, h = b.h * sc * scy;
+      const align = props.align === "left" || props.align === "right" ? props.align : "center";
+      const left = align === "left" ? x : align === "right" ? x - w : x - w / 2;
+      const [from, to] = window(layer);
+      blocks.push({ name: layer.id || `layer ${i}`, path: `$.layers[${i}]`, text: props.text, left, top: y - h / 2, w, h, from, to });
+    }
+  });
+  const docs = obj(input.docs) ? input.docs : {};
+  const parsed = new Map();
+  const piecesOf = (id) => {
+    if (!parsed.has(id)) {
+      const html = typeof docs[id] === "string" ? docs[id] : "";
+      const css = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join("\n");
+      const rules = cssRules(css);
+      parsed.set(id, new Map(pieces(html).map((piece) => [piece.part, { piece, style: styleFor(piece, rules) }])));
+    }
+    return parsed.get(id);
+  };
+  input.layers.forEach((layer, i) => {
+    if (!obj(layer) || layer.type !== "html" || layer.hidden === true || !obj(layer.props) || typeof layer.props.doc !== "string" || typeof layer.props.part !== "string") return;
+    const found = piecesOf(layer.props.doc).get(layer.props.part);
+    if (!found) return;
+    const { piece, style } = found;
+    const text = visibleText(piece.inner);
+    if (!text || !(style.fontSize > 0) || style.width != null || style.height != null || style.centerX == null || style.centerY == null) return;
+    const dx = steady(layer.props.dx, 0), dy = steady(layer.props.dy, 0);
+    const opacity = steady(layer.props.opacity, 1);
+    if (dx === null || dy === null || opacity === null || opacity <= 0.05 || (layer.props.text !== undefined)) return;
+    const sc = steady(layer.props.scale, 1);
+    if (sc === null || steady(layer.props.rotation, 0) !== 0) return;
+    const lines = text.split(/\n/);
+    const w = Math.max(...lines.map((line) => lineWidth(style.upper ? line.toUpperCase() : line, style.fontSize, 0))) * sc;
+    const h = lines.length * style.fontSize * Math.max(style.lineHeight == null ? 1.05 : style.lineHeight, 1) * sc;
+    const [from, to] = window(layer);
+    const cx = style.centerX * W + style.centerPx + dx, cy = style.centerY * H + style.centerPy + dy;
+    blocks.push({ name: `${layer.props.doc}/${layer.props.part}`, path: `$.layers[${i}]`, text, left: cx - w / 2, top: cy - h / 2, w, h, from, to });
+  });
+  return blocks;
+}
+
+/**
+ * Warns when two text blocks that are on screen at the same time cover each other. Only blocks with a fixed
+ * position and known text are compared (no keyframed x/y, no expressions, no parent), so it stays quiet on
+ * moving type. A warning, never an error: layered or echoed type can be on purpose.
+ */
+export function overlapIssues(input, warn) {
+  if (!Array.isArray(input.layers) || !(finite(input.width) && finite(input.height))) return;
+  const blocks = measurableBlocks(input);
+  const seen = new Set();
+  for (let a = 0; a < blocks.length; a++) {
+    for (let b = a + 1; b < blocks.length; b++) {
+      const A = blocks[a], B = blocks[b];
+      if (A.text.trim() === B.text.trim()) continue; // an echo, shadow or misregistered copy of the same words
+      if (Math.min(A.to, B.to) - Math.max(A.from, B.from) < OVERLAP_MIN_SECONDS) continue;
+      const iw = Math.min(A.left + A.w, B.left + B.w) - Math.max(A.left, B.left);
+      const ih = Math.min(A.top + A.h, B.top + B.h) - Math.max(A.top, B.top);
+      if (!(iw > 0 && ih > 0)) continue;
+      const share = (iw * ih) / Math.min(A.w * A.h, B.w * B.h);
+      if (share < OVERLAP_MIN_SHARE) continue;
+      const key = `${A.path}|${B.path}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      warn(B.path, "TEXT_OVERLAP", `"${A.name}" and "${B.name}" are on screen together and their estimated boxes overlap by ${Math.round(share * 100)}% of the smaller one (~${Math.round(iw)}×${Math.round(ih)} px). Move one, shrink the type, or stagger them in time; ignore it only if the overlap is the design.`);
+    }
+  }
 }

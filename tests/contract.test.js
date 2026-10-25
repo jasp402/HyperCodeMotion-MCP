@@ -13,7 +13,7 @@ test("MCP initialize, tools/list and validation",async()=>{
     return JSON.parse(body);
   };
   assert.equal((await call("initialize")).result.serverInfo.name,"hypercodemotion-mcp");
-  const listed=await call("tools/list");assert.equal(listed.result.tools.length,8);
+  const listed=await call("tools/list");assert.equal(listed.result.tools.length,9);
   const output=await call("tools/call",{name:"validate_json",arguments:{json}});
   assert.equal(JSON.parse(output.result.content[0].text).valid,true);
 });
@@ -31,7 +31,7 @@ test("Smithery metadata includes descriptions, annotations and output schemas",a
  for(const tool of listed.tools){
    assert.equal(tool.annotations.readOnlyHint,!["create_hcmotion","propose_template","publish_template","get_recreation_brief"].includes(tool.name));
    assert.equal(tool.annotations.destructiveHint,false);
-   assert.ok(tool.outputSchema);
+   if(tool.name!=="get_motion_recipe")assert.ok(tool.outputSchema); // plain-text result: no schema keeps the fixed load small
    assert.ok(tool.title);
  }
 });
