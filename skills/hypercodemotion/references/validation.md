@@ -4,7 +4,7 @@
 
 1. The HyperCodeMotion MCP is required. Call `get_capabilities` before designing layer properties and effects. If it is not connected, ask the user to connect it before generating.
 2. Generate one complete composition with `layers` at the root.
-3. Optionally call `validate_json` on drafts. `create_hcmotion` runs the same checks, so a separate `validate_json` call only helps while iterating on a draft you are unsure about.
+3. Always call `validate_json` on the finished draft before `create_hcmotion`: it returns the self-review checklist. Apply it and fix the composition; quality matters more than saving tokens. `create_hcmotion` runs the same checks again.
 4. Correct errors and investigate warnings. Validate again after corrections.
 5. Call `create_hcmotion`. If `created` is false, fix the listed errors and call it again. Hand the user the `open` and `download` links (valid 24 hours), never the raw JSON.
 6. Tell the user to open the `open` link and check the preview; you have not seen the render.
