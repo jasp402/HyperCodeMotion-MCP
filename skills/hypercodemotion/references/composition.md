@@ -50,6 +50,16 @@ Do not redraw an existing Lottie, glTF or GSAP file as rects or HTML pieces. Emi
 
 Optional composition structures include `scenes` (sequential periods and transitions), `docs` (HTML templates), `assets`, `audio`, `camera`, `params`, `plan`, `markers` and `components`. Do not fabricate structures: inspect Studio code for advanced fields.
 
+## Code layers and components
+
+`layer.code` (type `code`) and `components[x].draw` run as the body of a function that already declares `ctx`, `S`, `H` and puts these names in scope. **Do not declare any of them** with `const`, `let`, `var`, `function` or `class` (or destructure into them): use other names.
+
+- Code layers: `ctx`, `S`, `H`, `t`, `lt`, `dur`, `w`, `h`, `p`, `color`, `amount`, `amp`, `beat`, `hit`, `audio` and the helpers `sin cos tan asin acos atan atan2 abs sqrt pow exp log floor ceil round min max sign hypot PI TAU clamp lerp range smooth fract rand noise wave pingpong mix hsl ease`.
+- Components: the same, with `c` (the component's params) instead of `color amount amp beat hit audio`.
+- `S` is the engine's object (`S.t`, `S.w`, ...), not a place for your data. Name your own lists `SEG`, `ranges`, `pts`; loop variables such as `s`, `e`, `i` are fine.
+- Wrong: `const S=[[0,2.8],[3.7,5.4]]` / `const range=5` / `let t=0`. Right: `const SEG=[[0,2.8],[3.7,5.4]]; for (const [s,e] of SEG) { /* ... */ }`.
+- Studio tolerates a redeclaration (the original name is hidden for the rest of the code), but `validate_json` and `create_hcmotion` report it as the warning `RESERVED_NAME_DECLARED`. Fix it: it is a warning only because the file still opens.
+
 ## The user's own files (photos, cut-outs, logo, videos)
 
 When the request lists the user's files by id (Studio's «Tus materiales», e.g. `"video-1" · «playa.mp4» · video · 1920×1080 · 12.4 s`), those files already live in the user's Studio and are filled in by id when the project opens. Nothing is uploaded to the MCP.

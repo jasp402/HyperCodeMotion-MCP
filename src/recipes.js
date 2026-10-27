@@ -125,7 +125,7 @@ const camera = {
 const codeTexture = {
   summary: "Code layers: procedural texture and animated backgrounds (grain, scanlines, blobs...).",
   notes: [
-    "layer.code runs every frame on a canvas of props w x h centred at x,y (local 0,0 = top-left). Scope: ctx, t, lt (layer time), dur, w, h, p, color, amount (0-1), amp, beat, hit, audio, and helpers sin cos abs sqrt pow floor min max PI TAU clamp lerp smooth fract rand(i,k) noise wave pingpong mix hsl ease.",
+    "layer.code runs every frame on a canvas of props w x h centred at x,y (local 0,0 = top-left). Scope: ctx, t, lt (layer time), dur, w, h, p, color, amount (0-1), amp, beat, hit, audio, and helpers sin cos abs sqrt pow floor min max PI TAU clamp lerp smooth fract rand(i,k) noise wave pingpong mix hsl ease. Never declare these names yourself (const S, let t, function range...): use SEG, ranges, pts; the same goes for ctx, S, H.",
     "Stay deterministic (rand(i,k), noise, t; never Math.random). First = background; last with blend \"screen\"/\"multiply\" = texture over the art. A few hundred shapes at most.",
   ],
   fragment: {
