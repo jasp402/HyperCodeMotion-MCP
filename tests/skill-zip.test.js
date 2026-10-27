@@ -43,4 +43,5 @@ test("checkSkillMd rejects what claude.ai rejects", () => {
   assert.throws(() => checkSkillMd(md("x".repeat(201))), /200/);
   assert.throws(() => checkSkillMd(md("ok", "other")), /folder/);
   assert.throws(() => checkSkillMd("no frontmatter"), /frontmatter/);
+  assert.throws(() => checkSkillMd(md("promos: asks size")), /YAML/);
 });

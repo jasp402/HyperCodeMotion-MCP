@@ -30,6 +30,7 @@ export function checkSkillMd(text, folder = SKILL_NAME) {
   if (name !== folder) throw new Error(`skill name "${name}" must equal the folder name "${folder}"`);
   if (!/^[a-z0-9-]{1,64}$/.test(name) || /anthropic|claude/.test(name)) throw new Error("name: lowercase letters, numbers, hyphens; max 64; no 'anthropic'/'claude'");
   if (description.length > 200) throw new Error(`description is ${description.length} chars; claude.ai allows at most 200`);
+  if (/: |\s#/.test(description)) throw new Error("description has `: ` or ` #`, which is invalid in an unquoted YAML value (skills CLI rejects the skill); use `;` or a dash");
   return { name, description };
 }
 

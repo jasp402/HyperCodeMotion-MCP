@@ -1,6 +1,6 @@
 ---
 name: hypercodemotion
-description: Create motion graphics videos (promos, explainers, reels, titles) as editable HyperCodeMotion projects: asks canvas size, directs scenes and motion, delivers a .hcmotion via the HyperCodeMotion MCP.
+description: Create motion graphics videos (promos, explainers, reels, titles) as editable HyperCodeMotion projects; asks canvas size, directs scenes and motion, delivers a .hcmotion via the HyperCodeMotion MCP.
 ---
 
 # HyperCodeMotion — Creative Composition Skill
