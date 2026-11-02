@@ -3,6 +3,7 @@ import { validateComposition } from "./validator.js";
 import { screenRule } from "./frame.js";
 import { TRANSITIONS, checkScenes } from "./transitions.js";
 import { checkEases } from "./easing.js";
+import { checkSlides } from "./stylebrief.js";
 import { checkReservedNames, RESERVED_RULE, CODE_RESERVED, COMPONENT_RESERVED } from "./reserved.js";
 
 /** The user's own files («Tus materiales» in Studio): referenced by id, never uploaded here. */
@@ -66,6 +67,7 @@ export function validateJson(input, options = {}) {
   };
   if (report.format === "composition") input.layers.forEach((v,i)=>check(v,"$.layers["+i+"]"));
   if (report.format === "composition") notices.push(...checkScenes(input));
+  if (report.format === "composition") notices.push(...checkSlides(input));
   if (report.format === "improvement" && Array.isArray(input.add))
     input.add.forEach((v,i)=>check(v,"$.add["+i+"]"));
   const easeWarnings = report.format === "composition" || report.format === "improvement" ? checkEases(input) : [];
