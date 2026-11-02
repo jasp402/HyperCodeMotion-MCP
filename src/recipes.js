@@ -189,6 +189,7 @@ const sceneBg = {
 const autoedit = {
   summary: "Talking-head finish: captions with one emphasised keyword, punch-in zooms, motion screens, sound effects, all by reference to the user's video.",
   notes: [
+    "Order of a pro edit: colour grade, zoom, captions, motion screens, sound. Screen ideas: get_motion_recipe('autoedit-screens').",
     "The user's video is NOT in the JSON: a \"video\" layer FIRST, props.asset = the id given (V1), start 0, end = duration, covering the canvas. Studio fills the file and its voice; never add the voice or put the video in assets.",
     "Zoom = \"scale\" keys on V1, cut-style: jump to 1.12 or 1.2 when the keyword is said (two keys 0.01 s apart), back to 1 when the next caption starts. Alternate levels, max one every ~2.5 s, none under a screen.",
     "Captions: EVERY spoken word at its second, lower third (y 70% in 9:16, 76% in 16:9), never over the face (see the frames sheet), max 3 lines. Reading order: words before the keyword small (50-60 px, white, glow), the keyword ALONE on its line big (110-180 px, max 86% width), words after it small below. Small lines anim \"words\", stagger = word gap; keyword enters at its second (scale 0.6 or 1.8 -> 1, 0.3 s easeOutBack). A caption lasts until the next (min 0.8 s). Names «Sub C1»...",
@@ -209,6 +210,33 @@ const autoedit = {
       { id: "s1bg", type: "rect", name: "Pantalla S1", start: 2.2, end: 4, props: { x: { kf: [{ t: 2.2, v: 1620, ease: "easeOutCubic" }, { t: 2.42, v: 540 }] }, y: 960, w: 1080, h: 1920, fill: "#F3F1EC" } },
       { id: "s1t", type: "text", name: "Pantalla S1 · frase", start: 2.35, end: 4, props: { text: "how much money", x: 540, y: 880, size: 46, weight: 500, font: "Inter", color: "#111214", opacity: 0.75, align: "center" } },
       { id: "s1k", type: "text", name: "Pantalla S1 · clave", start: 2.5, end: 4, props: { text: "COMPANY", x: 540, y: 1000, size: 180, weight: 400, font: "Archivo Black", color: "#8A4A1F", align: "center", anim: "chars", stagger: 0.03, animDur: 0.35, animEase: "easeOutBack", fromY: 70, fromBlur: 8, fromOpacity: 0 } },
+    ],
+  },
+};
+
+// ---------- autoedit screens ----------
+// Patterns seen in professional before/after talking-head edits (owner's references, 2026-11-02).
+const autoeditScreens = {
+  summary: "What a talking-head edit puts on screen beyond captions: steps, lists, stat cards, logos, face in a circle, text behind the person.",
+  notes: [
+    "Steps (\"3 ways\", \"first\", \"number two\"): an accent circle with the number beside the caption, then a frosted card (rect fill rgba(255,255,255,.14), radius 28, backdrop blur) whose text types in word by word.",
+    "Spoken list (\"shooting, editing, talking to clients\"): a dark card over a gradient of the video's main colour; one row per item (icon + label) appearing when it is said; the face shrinks into a circle at the top (V1 scale ~0.3, a circle mask or an ellipse frame).",
+    "Money or metrics: a UI stat card (label, big value, green when up, red when down) that counts to the value; for \"leads\" or \"clients\" a row of avatar circles.",
+    "Tools or brands: their logos as rounded app-icon stickers popping around the keyword (draw them in SVG, never pretend a real logo you cannot draw: use the name in a pill).",
+    "Keyword icons: 1-3 glossy 3D-style icons (emoji or SVG) pop around the big keyword with a glow in the accent.",
+    "Full-screen idea cards: a solid brand colour with a mixed-font line (sans + script for one word), split screens with B-roll photos and a huge title, or huge text BEHIND the person (needs a cut-out of the user: only with a recorte material).",
+    "Grid of B-roll: photos appear one by one in a 2x2 grid on a soft gradient, each with a label (SCRIPTING, FILMING, EDITING).",
+    "Close with a call to action: a button-shaped card (\"Click the button below\") with 2-3 small steps under it.",
+    "Captions in these edits: heavy uppercase with a yellow or orange keyword and a dark outline, or lowercase tight-leading white with one word much bigger. Change the caption position only for a reason.",
+  ],
+  fragment: {
+    background: "#000000",
+    duration: 3,
+    layers: [
+      { id: "n1", type: "ellipse", name: "Paso 1", start: 0, end: 3, props: { x: 170, y: 1180, w: 120, h: 120, fill: "#FF8A1F", scale: { kf: [{ t: 0, v: 0, ease: "easeOutBack" }, { t: 0.35, v: 1 }] } } },
+      { id: "n1t", type: "text", name: "Paso 1 · número", start: 0, end: 3, props: { text: "1", x: 170, y: 1180, size: 70, weight: 400, font: "Archivo Black", color: "#111214" } },
+      { id: "card", type: "rect", name: "Paso 1 · tarjeta", start: 0.2, end: 3, props: { x: 600, y: 1180, w: 680, h: 200, radius: 28, fill: "rgba(255,255,255,.14)" } },
+      { id: "cardt", type: "text", name: "Paso 1 · texto", start: 0.3, end: 3, props: { text: "Learn the shortcuts", x: 600, y: 1180, size: 48, weight: 700, font: "Inter", color: "#FFFFFF", anim: "words", stagger: 0.15, animDur: 0.2, fromOpacity: 0 } },
     ],
   },
 };
@@ -296,7 +324,7 @@ function fragmentText(f) {
   return out.join("\n");
 }
 
-const STATIC = { autoedit, riso, choreography, audio, camera, "code-texture": codeTexture, "ui-mockup": uiMockup, "scene-bg": sceneBg };
+const STATIC = { autoedit, "autoedit-screens": autoeditScreens, riso, choreography, audio, camera, "code-texture": codeTexture, "ui-mockup": uiMockup, "scene-bg": sceneBg };
 
 function lookRecipe(look) {
   const C = look.colors, F = look.fonts, m = look.motion, s = look.shape;
