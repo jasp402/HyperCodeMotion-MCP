@@ -228,6 +228,7 @@ const autoeditScreens = {
     "Full-screen idea cards: a solid brand colour with a mixed-font line (sans + script for one word), split screens with B-roll photos and a huge title, or huge text BEHIND the person (needs a cut-out of the user: only with a recorte material).",
     "Grid of B-roll: photos appear one by one in a 2x2 grid on a soft gradient, each with a label (SCRIPTING, FILMING, EDITING).",
     "Voice-over cutaway (user asks to animate a phrase): a full-screen drawn scene (opaque rect over V1; the voice keeps playing) built from shapes that act out the words at their seconds (e.g. mug drops, sachet tilts, powder falls, spoon stirs, check on \"listo\"), captions in dark ink on it, hard cut or flash back to the person.",
+    "Polish: vary entrances (slide, scale-pop, wipe, chars) instead of one for every card; a transition between topic blocks; burned-in text in the source = ask for a clean video before covering it with a band; a real logo or photo is missing = «Falta imagen», never a fake.",
     "Close with a call to action: a button-shaped card (\"Click the button below\") with 2-3 small steps under it.",
     "Captions in these edits: heavy uppercase with a yellow or orange keyword and a dark outline, or lowercase tight-leading white with one word much bigger. Change the caption position only for a reason.",
   ],
