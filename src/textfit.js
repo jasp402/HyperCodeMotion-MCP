@@ -133,14 +133,33 @@ function checkText(layer, path, W, H, fail, warn) {
   const scale = axis(props.scale, DEFAULTS.scale) * axis(props.scaleX, 1);
   const scaleY = axis(props.scale, DEFAULTS.scale) * axis(props.scaleY, 1);
   const blocks = variants.map((text) => blockSize(text, size, Math.max(lineHeight, 1), tracking));
-  const boxW = Math.max(...blocks.map((b) => b.w)) * scale;
-  const boxH = Math.max(...blocks.map((b) => b.h)) * scaleY;
+  const textW = Math.max(...blocks.map((b) => b.w)) * scale;
+  const textH = Math.max(...blocks.map((b) => b.h)) * scaleY;
+  // rotated text (a vertical word down the side): what the screen has to hold is the turned box
+  const rots = rotationsOf(props.rotation);
+  if (rots === null) warn(`${path}.props`, "TEXT_FIT_UNEVALUATED", "rotation is an expression, so the turned size was not measured.");
+  const boxes = (rots ?? [0]).map((deg) => turned(textW, textH, deg));
+  const boxW = Math.max(...boxes.map((b) => b.w));
+  const boxH = Math.max(...boxes.map((b) => b.h));
   if (boxW > frame.safeW + 1 || boxH > frame.safeH + 1) {
     fail(`${path}.props`, "TEXT_DOES_NOT_FIT", `This text is about ${Math.ceil(boxW)}×${Math.ceil(boxH)} px. The ${frame.name} safe area is ${frame.safeW}×${frame.safeH} px (canvas ${W}×${H}; starting title ${frame.title} px, not a minimum). Lower size or wrap lines with \\n. The screen wins over a requested size.`);
   }
   // Placement is the layer's own x/y. A parent moves it; that offset is not measured.
   if (typeof layer.parent === "string") return;
   placeBox(path, props, boxW, boxH, W, H, frame, fail, warn);
+}
+
+/** The angles (degrees) a rotation takes; null for an expression. */
+function rotationsOf(value) {
+  const s = series(value);
+  if (s.expr) return null;
+  return s.values.length ? s.values : [0];
+}
+
+/** Bounding box of a w×h box turned by deg degrees. */
+function turned(w, h, deg) {
+  const a = (deg * Math.PI) / 180, c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+  return { w: w * c + h * sn, h: w * sn + h * c };
 }
 
 function axis(value, fallback) {

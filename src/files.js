@@ -28,7 +28,7 @@ export async function store() {
         const r = await b.get(path, { access: "private" });
         return r && r.statusCode === 200 ? new Uint8Array(await new Response(r.stream).arrayBuffer()) : null;
       },
-      list: async cursor => b.list({ prefix: "files/", cursor, limit: 1000 }),
+      list: async (cursor, prefix = "files/") => b.list({ prefix, cursor, limit: 1000 }),
       del: paths => b.del(paths)
     };
   }

@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/m/:upload/:key",
+      "destination": "/api/media?upload=:upload&key=:key"
+    },
+    {
       "source": "/subir/:id/:key",
       "destination": "/api/subir?id=:id&key=:key"
     },
@@ -28,7 +32,13 @@
   ],
   "functions": {
     "api/mcp.js": {
+      "maxDuration": 120
+    },
+    "api/d.js": {
       "maxDuration": 60
+    },
+    "api/media.js": {
+      "maxDuration": 30
     }
   },
   "crons": [

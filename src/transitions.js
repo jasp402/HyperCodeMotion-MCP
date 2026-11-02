@@ -2,13 +2,14 @@
  * Scene transitions as Studio plays them (Studio: packages/core/src/types.ts SceneTransition,
  * render.ts transitionAt / drawTransition). An ENTRY transition on scene i > 0, played at scene.start.
  */
-export const TRANSITION_TYPES = ["fade", "slide", "push", "wipe", "clockWipe", "iris", "zoom", "flip", "blur"];
+export const TRANSITION_TYPES = ["fade", "slide", "push", "wipe", "clockWipe", "iris", "zoom", "flip", "blur", "glass"];
 export const TRANSITION_DIRS = ["left", "right", "up", "down"];
 
 /** Compact contract shown by get_capabilities (kept short: it is paid for in every conversation that calls it). */
 export const TRANSITIONS = {
   where: "composition.scenes[i].transition on every scene after the first; scenes {id,name,start,end} are consecutive and never overlap",
-  shape: { type: TRANSITION_TYPES.join("|"), dur: "seconds > 0, typically 0.4-0.8, at most the scene length", dir: "left|right|up|down = side the new scene enters from (slide, push, wipe, flip; default right)", ease: "easing name, default easeInOutCubic" },
+  shape: { type: TRANSITION_TYPES.join("|"), dur: "seconds > 0, typically 0.4-0.8, at most the scene length", dir: "left|right|up|down = side the new scene enters from (slide, push, wipe, flip; default right); for glass, the edge the impact starts from (no dir = the centre)", ease: "easing name, default easeInOutCubic" },
+  glass: "The outgoing scene cracks from the impact, breaks into glass shards that refract it, flash at the edges with colour fringing and fly off over the new scene: an engine effect, seen but not edited. Best at dur 0.35-0.6 on a hit.",
   rules: "Entry transition at scene.start; the outgoing scene is frozen at its last frame while it plays, so keep motion in it finished before the cut. Ignored on the first scene and when dur <= 0; an unknown type is a hard cut.",
 };
 

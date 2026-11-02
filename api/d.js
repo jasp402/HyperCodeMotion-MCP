@@ -1,9 +1,10 @@
 import { gunzipSync } from "node:zlib";
 import { expired, pathOf, store, validId } from "../src/files.js";
+import { jsonPart } from "../src/hcmotion.js";
 
 /** File name from the project's own name (links no longer carry it). */
 function nameOf(bytes) {
- try { return `${String(JSON.parse(gunzipSync(bytes.subarray(48))).name || "")}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "proyecto"; }
+ try { return `${String(JSON.parse(gunzipSync(jsonPart(bytes))).name || "")}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "proyecto"; }
  catch { return "proyecto"; }
 }
 
@@ -25,5 +26,10 @@ export default async function handler(req, res) {
  res.setHeader("Content-Type", "application/octet-stream");
  res.setHeader("Content-Disposition", `attachment; filename="${name.endsWith(".hcmotion") ? name : name + ".hcmotion"}"`);
  res.setHeader("Content-Length", String(bytes.length));
- res.end(req.method === "HEAD" ? undefined : Buffer.from(bytes));
+ if (req.method === "HEAD") return res.end();
+ // projects with their media inside can weigh up to 200 MB: sent in pieces instead of one body
+ const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+ if (buf.length <= 4 * 1024 * 1024 || typeof res.write !== "function") return res.end(buf);
+ for (let o = 0; o < buf.length; o += 1024 * 1024) if (!res.write(buf.subarray(o, o + 1024 * 1024))) await new Promise(r => res.once ? res.once("drain", r) : r());
+ res.end();
 }

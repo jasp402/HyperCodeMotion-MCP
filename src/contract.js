@@ -6,7 +6,10 @@ import { checkEases } from "./easing.js";
 import { checkReservedNames, RESERVED_RULE, CODE_RESERVED, COMPONENT_RESERVED } from "./reserved.js";
 
 /** The user's own files («Tus materiales» in Studio): referenced by id, never uploaded here. */
-const USER_MATERIALS = "Files the user listed by id in their request (photos, cut-outs, a logo, videos) stay in Studio and are filled in by id when the project opens. Reference them with props.asset = <id>: an image as an \"image\" layer (or <img src=\"asset:<id>\"> in an HTML scene), a video as a \"video\" layer whose props.from is the second of the file where the shown clip starts; the clip lasts end - start and plays without sound. Do not put them in \"assets\" or as URLs, and use only ids the user gave.";
+const USER_MATERIALS = "Files the user listed by id in their request (photos, cut-outs, a logo, videos) stay in Studio and are filled in by id when the project opens. Reference them with props.asset = <id>: an image as an \"image\" layer (or <img src=\"asset:<id>\"> in an HTML scene), a video as a \"video\" layer whose props.from is the second of the file where the shown clip starts; the clip lasts end - start and plays without sound. Files the user gave YOU (attachments, a public link) go inside the .hcmotion instead: pick an id, use it the same way in props.asset, and pass the file in create_hcmotion media as {id, url} (public https) or {id, upload} (after start_media_upload). Never paste base64 into assets: it costs the whole conversation; media sends the bytes.";
+
+/** composition.post (Studio: types.ts PostFx, render.ts applyPost). */
+const POST_FX = { where: "composition.post", shape: { bloom: "0-3 glow of the bright parts (lightning, sparks, glowing text)", bloomThreshold: "0-1, default 0.6", bloomRadius: "px, default 2.5% of the short side", aberration: "px the red and blue split at the edges", vignette: "0-1 darker corners", grain: "0-1 film grain" }, rules: "Applied to the whole frame after every layer, in preview and export; an engine effect, seen but not edited per layer. bloom, aberration, vignette and grain take a value, keyframes or an expression (raise aberration on a hit)." };
 
 /** Where the connector-only user (no Skill installed) gets the essentials: claude.ai does not show `initialize.instructions`, but it does show tool results. */
 const START = "Before designing, ask the user once for the canvas size unless they gave it: 9:16 1080x1920, 1:1 1080x1080, 4:5 1080x1350, 16:9 1920x1080 (or custom). Build one scene per beat in scenes[] and join them with transitions. Deliver only the open and download links from create_hcmotion, never the JSON. In code layers and components never declare a name the engine provides (S, H, ctx, t, w, h, helpers like range: field reservedCodeNames). For a look the basics do not give (riso print, springs, camera, audio, UI mockups, per-scene backgrounds, 13 style looks) call get_motion_recipe first.";
@@ -39,6 +42,7 @@ export function getCapabilities() {
     start: START,
     transitions: TRANSITIONS,
     userMaterials: USER_MATERIALS,
+    post: POST_FX,
     reservedCodeNames: { rule: RESERVED_RULE, codeLayer: CODE_RESERVED, component: COMPONENT_RESERVED },
     screen: screenRule(),
     fullyValidated: false };
