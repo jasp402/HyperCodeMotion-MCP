@@ -128,3 +128,32 @@ test("create_hcmotion returns the checklist once the file is created, and none w
   const bad = await call("create_hcmotion", { json: { version: 1 } });
   assert.equal(JSON.parse(bad.content[0].text).checklist, undefined);
 });
+
+test("style-brief: in the index, returned by name, not a fragment recipe", async () => {
+  const { motionRecipe, RECIPE_NAMES } = await import("../src/recipes.js");
+  assert.ok(motionRecipe().text.includes("style-brief"));
+  const r = motionRecipe("style-brief");
+  assert.ok(r.found && r.text.includes("3 concepts") && r.text.includes("create_hcmotion"));
+  assert.ok(!RECIPE_NAMES.includes("style-brief"));
+});
+
+test("checkSlides warns (never errors) on 3+ scenes with only fades and no camera", async () => {
+  const { validateJson } = await import("../src/contract.js");
+  const L = (id, s, e) => ({ id, type: "rect", start: s, end: e, props: { width: 100, height: 100, fill: "#fff" } });
+  const base = { version: 1, name: "s", width: 1080, height: 1920, fps: 30, duration: 9, background: "#000", params: {},
+    scenes: [{ id: "a", name: "a", start: 0, end: 3 }, { id: "b", name: "b", start: 3, end: 6, transition: { type: "fade", dur: 0.5 } }, { id: "c", name: "c", start: 6, end: 9, transition: { type: "fade", dur: 0.5 } }],
+    layers: [L("a", 0, 3), L("b", 3, 6), L("c", 6, 9)] };
+  const r = validateJson(base);
+  assert.ok(r.valid);
+  assert.ok(r.warnings.some((w) => w.code === "SLIDE_LIKE_SCENES"));
+  const withCam = validateJson({ ...base, layers: [...base.layers, { id: "cam", type: "camera", start: 0, end: 9, props: { zoom: 1 } }] });
+  assert.ok(!withCam.warnings.some((w) => w.code === "SLIDE_LIKE_SCENES"));
+});
+
+test("create_hcmotion brief is optional and stored as meta.brief", async () => {
+  const { normalizeBrief } = await import("../src/stylebrief.js");
+  assert.equal(normalizeBrief(undefined), undefined);
+  assert.equal(normalizeBrief("  "), undefined);
+  assert.deepEqual(normalizeBrief("marca X"), { text: "marca X" });
+  assert.deepEqual(normalizeBrief({ palette: ["#000"] }), { palette: ["#000"] });
+});

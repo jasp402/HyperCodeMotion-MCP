@@ -9,6 +9,7 @@
  */
 import { LOOKS, DECO } from "./looks.js";
 import { EASE_NAMES, UI_SPRING_NAMES } from "./easing.js";
+import { STYLE_BRIEF } from "./stylebrief.js";
 
 const FONT_LINK = (family) => `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${family}&amp;display=swap">`;
 const doc = (head, css, body) => `<!doctype html><html><head><meta charset="utf-8">${head}<style>html,body{width:100%;height:100%;margin:0;background:transparent;overflow:hidden}body{position:relative}${css}</style></head><body>${body}</body></html>`;
@@ -295,11 +296,13 @@ export function recipeFragment(name) {
 export function recipeIndex() {
   const rows = Object.entries(STATIC).map(([k, v]) => `${k}: ${v.summary}`);
   rows.push(`looks: ${looks.summary}`);
-  return `Motion recipes. Call get_motion_recipe with name=:\n${rows.join("\n")}\nlook:<id> (${LOOKS.map((l) => l.id).join(", ")}): one look in full.`;
+  rows.unshift("style-brief: mandatory first step: brief, branding, 3 concepts, anti-slide rules (no fragment).");
+  return `Before designing an original video: call get_motion_recipe with name=style-brief and follow it (brief, 3 concepts, wait for the user to pick).\n\nMotion recipes. Call get_motion_recipe with name=:\n${rows.join("\n")}\nlook:<id> (${LOOKS.map((l) => l.id).join(", ")}): one look in full.`;
 }
 
 /** Text of a recipe, or null when the name is unknown. */
 export function recipeText(name) {
+  if (name === "style-brief") return STYLE_BRIEF;
   if (STATIC[name]) {
     const r = STATIC[name];
     return `# ${name}. ${r.summary}\n${r.notes.map((n) => "- " + n).join("\n")}\n${fragmentText(r.fragment)}`;
