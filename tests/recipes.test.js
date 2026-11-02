@@ -19,9 +19,9 @@ const call = async (name, args = {}) => {
 
 test("there are 9 topic recipes, the looks table and one recipe per look", () => {
   assert.equal(LOOKS.length, 13);
-  for (const n of ["autoedit", "autoedit-screens", "riso", "choreography", "audio", "camera", "code-texture", "ui-mockup", "scene-bg", "looks"]) assert.ok(RECIPE_NAMES.includes(n), n);
+  for (const n of ["glitch", "autoedit", "autoedit-screens", "riso", "choreography", "audio", "camera", "code-texture", "ui-mockup", "scene-bg", "looks"]) assert.ok(RECIPE_NAMES.includes(n), n);
   for (const l of LOOKS) assert.ok(RECIPE_NAMES.includes("look:" + l.id), l.id);
-  assert.equal(RECIPE_NAMES.length, 10 + 13);
+  assert.equal(RECIPE_NAMES.length, 11 + 13);
 });
 
 test("every recipe passes validateJson with no errors and no warning but the contract notice", () => {
@@ -48,7 +48,7 @@ test("recipe sizes stay on demand: topic recipes under ~800 tokens, looks table 
   // 1 token ≈ 3.2 characters for JSON/HTML (cl100k measured on these recipes); generous bounds
   for (const name of RECIPE_NAMES) {
     const chars = recipeText(name).length;
-    assert.ok(chars < (name === "looks" ? 5200 : name === "riso" || name.startsWith("autoedit") ? 4400 : 3200), name + " " + chars);
+    assert.ok(chars < (name === "looks" ? 5200 : name === "riso" || name.startsWith("autoedit") || name === "glitch" ? 4400 : 3200), name + " " + chars);
   }
 });
 
@@ -127,4 +127,18 @@ test("validate_json adds the checklist only to valid compositions, never next to
 test("create_hcmotion returns the checklist once the file is created, and none when it is not", async () => {
   const bad = await call("create_hcmotion", { json: { version: 1 } });
   assert.equal(JSON.parse(bad.content[0].text).checklist, undefined);
+});
+
+test("glitch recipe: bursts under 600 ms, opposite RGB split, slices, hold steps, seeded", () => {
+  const t = recipeText("glitch");
+  for (const w of ["150-400 ms", "OPPOSITE", "4-8 horizontal strips", "12-15 fps", "Anti-patterns", "Math.random"]) assert.ok(t.includes(w), w);
+  const L = Object.fromEntries(recipeFragment("glitch").layers.map((l) => [l.id, l]));
+  const kx = (id) => L[id].props.x.kf;
+  for (const id of ["gR", "gB", "gW"]) assert.ok(kx(id).every((k, i, a) => i === a.length - 1 || k.ease === "hold"), id);
+  const span = kx("gW").at(-1).t - kx("gW")[1].t;
+  assert.ok(span > 0.15 && span <= 0.6, "burst " + span);
+  for (let i = 1; i < kx("gR").length - 1; i++) assert.ok(Math.sign(kx("gR")[i].v - 540) === -Math.sign(kx("gB")[i].v - 540), "opposite " + i);
+  assert.equal(L.gR.props.blend, "screen");
+  assert.ok(!L.gSlices.code.includes("Math.random") && L.gSlices.code.includes("rand("));
+  assert.ok(motionRecipe().text.includes("glitch:"));
 });

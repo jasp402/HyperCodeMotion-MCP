@@ -244,6 +244,35 @@ const autoeditScreens = {
   },
 };
 
+// ---------- glitch ----------
+// Owner feedback 2026-11-02: a glitch that is only flicker/jitter looks amateur. Bursts, RGB split, slices, steps, clean resolve.
+const GLITCH_CODE = "const G=[[1,1.08],[1.14,1.26]];let k=-1;for(let i=0;i<G.length;i++)if(lt>=G[i][0]&&lt<G[i][1])k=i;if(k<0)return;const fr=floor(lt*12);for(let i=0;i<6;i++){const sy=floor(rand(i,fr)*h);const sh=20+rand(i+9,fr)*140;const dx=(rand(i+20,fr)-0.5)*120;ctx.fillStyle=i%2?'rgba(0,255,255,0.35)':'rgba(255,0,255,0.35)';ctx.fillRect(dx,sy,w,sh);}if(rand(99,fr)>0.5){ctx.fillStyle=rand(98,fr)>0.5?'#00FFFF':'#FF00FF';ctx.fillRect(rand(97,fr)*w*0.7,rand(96,fr)*h,w*0.3,30);}ctx.fillStyle='rgba(255,255,255,0.12)';for(let y=0;y<h;y+=6)ctx.fillRect(0,y,w,2);";
+const hk = (pairs) => ({ kf: pairs.map(([t, v]) => ({ t, v, ease: "hold" })) });
+const glitch = {
+  summary: "Professional glitch: irregular bursts, real RGB split, slice displacement, stepped frames, impact and a clean resolve.",
+  notes: [
+    "Bursts, never a loop: 150-400 ms in total, 2-3 irregular hits with gaps (e.g. 80 ms on, 60 ms off, 120 ms on). Never longer than 600 ms.",
+    "RGB split: duplicate the layer in red (#FF0000) and cyan/blue (#00FFFF) copies with blend \"screen\" under the white one; red and blue move in OPPOSITE directions, 6-20 px, horizontal only, and the offset changes every frame of the burst. Outside the burst offset 0 (copies hidden behind the original).",
+    "Slice displacement (the key ingredient): 4-8 horizontal strips of random height, each shifted in X on its own by +-10-60 px. In an HTML scene: N copies of the element, each clip-path: inset(top 0 bottom 0) and its own translateX. Over native layers: a code layer drawing offset strips (below).",
+    "Stepped frames: during the burst animate at 12-15 fps with ease \"hold\" keys every 1/12 s (code layers: floor(lt*12) as the seed); the rest of the video stays fluid.",
+    "Texture: scanlines at 10-15 % opacity, noise/grain, 1-2 solid cyan/magenta blocks lasting 1-2 frames.",
+    "Impact: scale jump 1.02-1.05 and 1-2 frames inverted or boosted brightness, synced to a glitch sfx or an audio cut.",
+    "Intent: use it for entrances, scene changes or to hit a keyword, on the beat or the stressed syllable, not at random.",
+    "Resolve clean: end on a stable sharp frame (offsets 0, scale 1) with a small settle (1.03 -> 1 spring snappy).",
+    "Deterministic: seeded randomness only (rand(i,frame), noise); never Math.random, so preview = export.",
+    "Anti-patterns: only an opacity flicker; the whole layer jittering uniformly; a static RGB offset; a glitch lasting > 600 ms or looping.",
+  ],
+  fragment: {
+    background: "#07070C",
+    layers: [
+      { id: "gR", type: "text", name: "Glitch · rojo", start: 0, end: 6, props: { text: "GLITCH", x: hk([[0, 540], [1, 526], [1.04, 552], [1.08, 540], [1.14, 548], [1.18, 530], [1.22, 556], [1.26, 540]]), y: 960, size: 170, weight: 800, color: "#FF0000", blend: "screen" } },
+      { id: "gB", type: "text", name: "Glitch · azul", start: 0, end: 6, props: { text: "GLITCH", x: hk([[0, 540], [1, 556], [1.04, 530], [1.08, 540], [1.14, 532], [1.18, 552], [1.22, 526], [1.26, 540]]), y: 960, size: 170, weight: 800, color: "#00FFFF", blend: "screen" } },
+      { id: "gW", type: "text", name: "Glitch · texto", start: 0, end: 6, props: { text: "GLITCH", x: hk([[0, 540], [1, 560], [1.04, 510], [1.08, 540], [1.14, 515], [1.18, 570], [1.22, 540]]), y: 960, size: 170, weight: 800, color: "#FFFFFF", scale: { kf: [{ t: 0, v: 1, ease: "hold" }, { t: 1, v: 1.04, ease: "hold" }, { t: 1.08, v: 1, ease: "hold" }, { t: 1.14, v: 1.05, ease: "hold" }, { t: 1.26, v: 1.03 }, { t: 1.5, v: 1 }], spring: "snappy" } } },
+      { id: "gSlices", type: "code", name: "Glitch · franjas", start: 0, end: 6, props: { x: 540, y: 960, w: 1080, h: 1920, color: "#FFFFFF", amount: 1 }, code: GLITCH_CODE },
+    ],
+  },
+};
+
 // ---------- looks ----------
 /** Title size caps so "Big idea" fits the 928 px safe width of a 1080 canvas (checked by tests/recipes.test.js). */
 const TITLE_MAX = { medianoche: 130, maximalista: 130 };
@@ -327,7 +356,7 @@ function fragmentText(f) {
   return out.join("\n");
 }
 
-const STATIC = { autoedit, "autoedit-screens": autoeditScreens, riso, choreography, audio, camera, "code-texture": codeTexture, "ui-mockup": uiMockup, "scene-bg": sceneBg };
+const STATIC = { autoedit, glitch, "autoedit-screens": autoeditScreens, riso, choreography, audio, camera, "code-texture": codeTexture, "ui-mockup": uiMockup, "scene-bg": sceneBg };
 
 function lookRecipe(look) {
   const C = look.colors, F = look.fonts, m = look.motion, s = look.shape;
