@@ -183,6 +183,36 @@ const sceneBg = {
   },
 };
 
+// ---------- autoedit ----------
+// AutoEdit (Studio «Anima lo que tienes → Video» with a person talking): the user's video travels by id ("V1"),
+// with its words timed; Claude does the professional finish. Same plan Studio builds without AI (welcome/ae.ts).
+const autoedit = {
+  summary: "Talking-head finish: captions with one emphasised keyword, punch-in zooms, motion screens, sound effects, all by reference to the user's video.",
+  notes: [
+    "The user's video is NOT in the JSON: a \"video\" layer FIRST, props.asset = the id given (V1), start 0, end = duration, covering the canvas. Studio fills the file and its voice; never add the voice or put the video in assets.",
+    "Zoom = \"scale\" keys on V1, cut-style: jump to 1.12 or 1.2 when the keyword is said (two keys 0.01 s apart), back to 1 when the next caption starts. Alternate levels, max one every ~2.5 s, none under a screen.",
+    "Captions: EVERY spoken word at its second, lower third (y 70% in 9:16, 76% in 16:9), never over the face (see the frames sheet), max 3 lines. Reading order: words before the keyword small (50-60 px, white, glow), the keyword ALONE on its line big (110-180 px, max 86% width), words after it small below. Small lines anim \"words\", stagger = word gap; keyword enters at its second (scale 0.6 or 1.8 -> 1, 0.3 s easeOutBack). A caption lasts until the next (min 0.8 s). Names «Sub C1»...",
+    "Emphasis, ONE style per video: accent colour | accent box | accent underline | white outline | karaoke (fromOpacity 0.35). One keyword per caption; numbers always.",
+    "Screens every 4-6 s on the strongest phrase, 1.3-2.6 s, covering the video (paper #F3F1EC + ink #111214 with the accent darkened, ink + accent, or the accent). Slide in 0.22 s, hard cut out. Phrase small, keyword or number huge (max 78% width), an HTML/SVG illustration of what is said, editorial details (index 01 / 04, hairlines, barcode, side labels). Names «Pantalla S1»...",
+    "User photos/videos (ids) = B-roll in screens under a 0.42 black veil, white text. An image you cannot draw: rect «Falta imagen: <what>».",
+    "audio.sfx (library ids): whoosh 0.7 before each screen, pop 0.35 on zooms, impact on a big number, riser (t = end) before the peak. Max one per 1.5 s.",
+  ],
+  fragment: {
+    background: "#000000",
+    duration: 4,
+    audio: { bpm: 120, volume: 0.8, auto: false, autoGain: 0.7, profile: "minimal", density: "normal", tracks: [], sfx: [{ id: "s1", t: 0.4, sound: "pop", gain: 0.35 }, { id: "s2", t: 2.12, sound: "whoosh", gain: 0.7 }] },
+    layers: [
+      { id: "v1", type: "video", name: "Tu video", start: 0, end: 4, props: { asset: "V1", x: 540, y: 960, w: 1080, h: 1920, scale: { kf: [{ t: 0, v: 1 }, { t: 0.39, v: 1 }, { t: 0.4, v: 1.12 }, { t: 1.99, v: 1.12 }, { t: 2, v: 1 }] } } },
+      { id: "c1", type: "text", name: "Sub C1", start: 0, end: 2.2, props: { text: "If you want to", x: 540, y: 1290, size: 58, weight: 700, font: "Inter", color: "#FFFFFF", align: "center", glow: 34, glowColor: "rgba(0,0,0,.6)", anim: "words", stagger: 0.12, animDur: 0.18, animEase: "easeOutCubic", fromY: 20, fromOpacity: 0 } },
+      { id: "c1box", type: "rect", name: "Sub C1 · caja", start: 0.4, end: 2.2, props: { x: 540, y: 1400, w: 720, h: 150, radius: 0, fill: "#FF6A3D", scaleX: { kf: [{ t: 0.4, v: 0, ease: "easeOutExpo" }, { t: 0.65, v: 1 }] } } },
+      { id: "c1key", type: "text", name: "Sub C1 · clave", start: 0.4, end: 2.2, props: { text: "EARN MORE", x: 540, y: 1400, size: 130, weight: 400, font: "Archivo Black", color: "#111214", align: "center", anim: "words", stagger: 0, animDur: 0.3, animEase: "easeOutBack", fromScale: 0.6, fromOpacity: 0 } },
+      { id: "s1bg", type: "rect", name: "Pantalla S1", start: 2.2, end: 4, props: { x: { kf: [{ t: 2.2, v: 1620, ease: "easeOutCubic" }, { t: 2.42, v: 540 }] }, y: 960, w: 1080, h: 1920, fill: "#F3F1EC" } },
+      { id: "s1t", type: "text", name: "Pantalla S1 · frase", start: 2.35, end: 4, props: { text: "how much money", x: 540, y: 880, size: 46, weight: 500, font: "Inter", color: "#111214", opacity: 0.75, align: "center" } },
+      { id: "s1k", type: "text", name: "Pantalla S1 · clave", start: 2.5, end: 4, props: { text: "COMPANY", x: 540, y: 1000, size: 180, weight: 400, font: "Archivo Black", color: "#8A4A1F", align: "center", anim: "chars", stagger: 0.03, animDur: 0.35, animEase: "easeOutBack", fromY: 70, fromBlur: 8, fromOpacity: 0 } },
+    ],
+  },
+};
+
 // ---------- looks ----------
 /** Title size caps so "Big idea" fits the 928 px safe width of a 1080 canvas (checked by tests/recipes.test.js). */
 const TITLE_MAX = { medianoche: 130, maximalista: 130 };
@@ -266,7 +296,7 @@ function fragmentText(f) {
   return out.join("\n");
 }
 
-const STATIC = { riso, choreography, audio, camera, "code-texture": codeTexture, "ui-mockup": uiMockup, "scene-bg": sceneBg };
+const STATIC = { autoedit, riso, choreography, audio, camera, "code-texture": codeTexture, "ui-mockup": uiMockup, "scene-bg": sceneBg };
 
 function lookRecipe(look) {
   const C = look.colors, F = look.fonts, m = look.motion, s = look.shape;

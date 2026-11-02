@@ -17,11 +17,11 @@ const call = async (name, args = {}) => {
   return JSON.parse(body).result;
 };
 
-test("there are 7 topic recipes, the looks table and one recipe per look", () => {
+test("there are 8 topic recipes, the looks table and one recipe per look", () => {
   assert.equal(LOOKS.length, 13);
-  for (const n of ["riso", "choreography", "audio", "camera", "code-texture", "ui-mockup", "scene-bg", "looks"]) assert.ok(RECIPE_NAMES.includes(n), n);
+  for (const n of ["autoedit", "riso", "choreography", "audio", "camera", "code-texture", "ui-mockup", "scene-bg", "looks"]) assert.ok(RECIPE_NAMES.includes(n), n);
   for (const l of LOOKS) assert.ok(RECIPE_NAMES.includes("look:" + l.id), l.id);
-  assert.equal(RECIPE_NAMES.length, 8 + 13);
+  assert.equal(RECIPE_NAMES.length, 9 + 13);
 });
 
 test("every recipe passes validateJson with no errors and no warning but the contract notice", () => {
@@ -48,7 +48,7 @@ test("recipe sizes stay on demand: topic recipes under ~800 tokens, looks table 
   // 1 token ≈ 3.2 characters for JSON/HTML (cl100k measured on these recipes); generous bounds
   for (const name of RECIPE_NAMES) {
     const chars = recipeText(name).length;
-    assert.ok(chars < (name === "looks" ? 5200 : name === "riso" ? 4400 : 3200), name + " " + chars);
+    assert.ok(chars < (name === "looks" ? 5200 : name === "riso" || name === "autoedit" ? 4400 : 3200), name + " " + chars);
   }
 });
 
