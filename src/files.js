@@ -23,7 +23,7 @@ export async function store() {
   if (!blob) {
     const b = await import("@vercel/blob");
     blob = {
-      put: (path, bytes) => b.put(path, Buffer.from(bytes), { access: "private", contentType: "application/octet-stream", addRandomSuffix: false }),
+      put: (path, bytes) => b.put(path, Buffer.from(bytes), { access: "private", contentType: "application/octet-stream", addRandomSuffix: false, allowOverwrite: true }),
       get: async path => {
         const r = await b.get(path, { access: "private" });
         return r && r.statusCode === 200 ? new Uint8Array(await new Response(r.stream).arrayBuffer()) : null;
