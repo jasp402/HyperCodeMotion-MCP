@@ -58,6 +58,19 @@ export async function deliverResult({ session_code, download } = {}, now = Date.
   return { delivered: true, message: "The project was sent to HyperCodeMotion Studio; it opens there by itself. Also give the user the open link in case the Studio tab was closed." };
 }
 
+export const ERROR_CODES = ["VIDEO_UNAVAILABLE", "VIDEO_PRIVATE", "VIDEO_TOO_LARGE", "CANNOT_VIEW", "OTHER"];
+
+/** Claude: tells the waiting Studio it could not do the job (e.g. it cannot view the video), so it stops waiting. */
+export async function deliverError({ session_code, code, message } = {}, now = Date.now()) {
+  if (!validCode(session_code)) return { reported: false, error: "BAD_CODE", message: "session_code must look like HCM-XXXX-XXXX-XXXX, exactly as written in the user's request." };
+  const c = ERROR_CODES.includes(code) ? code : "OTHER";
+  const s = await read(session_code);
+  if (!s || now >= s.expiresAt) return { reported: false, error: "NO_SESSION", message: "No Studio is waiting with that code. Tell the user directly." };
+  if (s.status === "delivered") return { reported: false, error: "ALREADY_DELIVERED", message: "A project was already delivered to that session." };
+  await write(session_code, { ...s, status: "failed", errorCode: c, errorMessage: String(message ?? "").slice(0, 300), failedAt: now });
+  return { reported: true, message: "The Studio was told; it shows the user what happened and how to continue. Also explain it to the user in one short sentence." };
+}
+
 /** Studio: polls with the secret key. Wrong key or unknown code look the same (not found). */
 export async function pollSession(code, key, now = Date.now()) {
   if (!validCode(code) || typeof key !== "string" || key.length < 32) return { status: "not_found" };
@@ -66,6 +79,7 @@ export async function pollSession(code, key, now = Date.now()) {
   const a = Buffer.from(hashKey(key), "hex"), b = Buffer.from(String(s.keyHash), "hex");
   if (a.length !== b.length || !timingSafeEqual(a, b)) return { status: "not_found" };
   if (now >= s.expiresAt) return { status: "expired" };
+  if (s.status === "failed") return { status: "failed", code: s.errorCode || "OTHER", message: s.errorMessage || "" };
   if (s.status !== "delivered" || !s.fileId) return { status: "waiting", expiresAt: new Date(s.expiresAt).toISOString() };
   return { status: "delivered", download: `${PUBLIC_URL}/d/${s.fileId}`, open: `${STUDIO_URL}/?p=${s.fileId}`, deliveredAt: new Date(s.deliveredAt).toISOString(), fileExpiresAt: new Date(createdAt(s.fileId) + 24 * 3600e3).toISOString() };
 }

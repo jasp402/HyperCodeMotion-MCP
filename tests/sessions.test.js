@@ -71,3 +71,17 @@ test("HTTP: POST opens, GET polls, wrong key is 404", async () => {
   assert.equal((await call({ method: "GET", url: `/api/session?code=${CODE}&key=${"z".repeat(48)}` })).statusCode, 404);
   assert.equal((await call({ method: "OPTIONS" })).statusCode, 204);
 });
+
+test("deliver_error: the Studio sees failed with code and message; not after delivery", async () => {
+  const { openSession, deliverError, pollSession, hashKey } = await import("../src/sessions.js");
+  const code = "HCM-ERRR-TEST-2345", key = "k".repeat(40);
+  await openSession({ code, keyHash: hashKey(key), tool: "clonar-tiktok" });
+  assert.equal((await deliverError({ session_code: "bad", code: "CANNOT_VIEW" })).error, "BAD_CODE");
+  assert.equal((await deliverError({ session_code: "HCM-NAAA-NAAA-2345", code: "CANNOT_VIEW" })).error, "NO_SESSION");
+  const r = await deliverError({ session_code: code, code: "VIDEO_PRIVATE", message: "Es privado" });
+  assert.equal(r.reported, true);
+  assert.deepEqual(await pollSession(code, key), { status: "failed", code: "VIDEO_PRIVATE", message: "Es privado" });
+  const r2 = await deliverError({ session_code: code, code: "weird" });
+  assert.equal(r2.reported, true);
+  assert.equal((await pollSession(code, key)).code, "OTHER");
+});
