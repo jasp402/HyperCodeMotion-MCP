@@ -1,6 +1,7 @@
 import { sweep } from "../src/files.js";
 import { sweepLimits } from "../src/community.js";
 import { sweepMedia } from "../src/media.js";
+import { sweepSessions } from "../src/sessions.js";
 
 /** Daily cron: deletes expired .hcmotion files so the store does not fill up. */
 export default async function handler(req, res) {
@@ -9,7 +10,8 @@ export default async function handler(req, res) {
  const removed = await sweep();
  const limits = await sweepLimits().catch(() => 0);
  const media = await sweepMedia().catch(() => 0);
+ const sessions = await sweepSessions().catch(() => 0);
  res.statusCode = 200;
  res.setHeader("Content-Type", "application/json");
- res.end(JSON.stringify({ removed, limits, media }));
+ res.end(JSON.stringify({ removed, limits, media, sessions }));
 }
