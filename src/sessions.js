@@ -58,7 +58,7 @@ export async function deliverResult({ session_code, download } = {}, now = Date.
   return { delivered: true, message: "The project was sent to HyperCodeMotion Studio; it opens there by itself. Also give the user the open link in case the Studio tab was closed." };
 }
 
-export const ERROR_CODES = ["VIDEO_UNAVAILABLE", "VIDEO_PRIVATE", "VIDEO_TOO_LARGE", "CANNOT_VIEW", "OTHER"];
+export const ERROR_CODES = ["VIDEO_UNAVAILABLE", "VIDEO_PRIVATE", "VIDEO_TOO_LARGE", "CANNOT_VIEW", "NOT_MOTION_GRAPHIC", "OTHER"];
 
 /** Claude: tells the waiting Studio it could not do the job (e.g. it cannot view the video), so it stops waiting. */
 export async function deliverError({ session_code, code, message } = {}, now = Date.now()) {
@@ -84,6 +84,72 @@ export async function pollSession(code, key, now = Date.now()) {
   return { status: "delivered", download: `${PUBLIC_URL}/d/${s.fileId}`, open: `${STUDIO_URL}/?p=${s.fileId}`, deliveredAt: new Date(s.deliveredAt).toISOString(), fileExpiresAt: new Date(createdAt(s.fileId) + 24 * 3600e3).toISOString() };
 }
 
+/**
+ * Input package: what the Studio measured in the user's browser (scenes, rhythm, transcript, palette)
+ * plus a few low-resolution key frames as JPEG. Claude cannot watch or hear a video, so this is what it
+ * works from. Only the browser that holds the key can attach it; Claude reads it with the session code.
+ */
+export const INPUT_MAX_IMAGES = 20;
+export const INPUT_MAX_IMAGE_BYTES = 300 * 1024;
+export const INPUT_MAX_TOTAL_BYTES = 3 * 1024 * 1024; // ~4 MB in base64: under the 4.5 MB request limit of Vercel functions
+export const INPUT_MAX_SUMMARY_BYTES = 64 * 1024;
+const inputPath = code => `session-input/${code}.json`;
+const JPEG_B64 = /^\/9j\/[A-Za-z0-9+/]+={0,2}$/;
+
+async function keyOk(s, key) {
+  if (!s || typeof key !== "string" || key.length < 32) return false;
+  const a = Buffer.from(hashKey(key), "hex"), b = Buffer.from(String(s.keyHash), "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Studio: attaches the input package to its waiting session (replaces an earlier one). */
+export async function attachInput({ code, key, summary, images } = {}, now = Date.now()) {
+  if (!validCode(code)) return { ok: false, error: "BAD_CODE" };
+  const s = await read(code);
+  if (!(await keyOk(s, key))) return { ok: false, error: "NOT_FOUND" };
+  if (now >= s.expiresAt) return { ok: false, error: "EXPIRED" };
+  if (s.status !== "waiting") return { ok: false, error: "CLOSED" };
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return { ok: false, error: "BAD_SUMMARY" };
+  const text = JSON.stringify(summary);
+  if (Buffer.byteLength(text) > INPUT_MAX_SUMMARY_BYTES) return { ok: false, error: "SUMMARY_TOO_LARGE" };
+  const list = Array.isArray(images) ? images : [];
+  if (list.length > INPUT_MAX_IMAGES) return { ok: false, error: "TOO_MANY_IMAGES" };
+  let total = 0;
+  const clean = [];
+  for (const im of list) {
+    const data = typeof im?.data === "string" ? im.data : "";
+    if (!JPEG_B64.test(data)) return { ok: false, error: "BAD_IMAGE" };
+    const bytes = Math.floor((data.length * 3) / 4);
+    if (bytes > INPUT_MAX_IMAGE_BYTES) return { ok: false, error: "IMAGE_TOO_LARGE" };
+    total += bytes;
+    clean.push({ data, caption: String(im.caption ?? "").slice(0, 200) });
+  }
+  if (total > INPUT_MAX_TOTAL_BYTES) return { ok: false, error: "INPUT_TOO_LARGE" };
+  await (await store()).put(inputPath(code), new TextEncoder().encode(JSON.stringify({ summary, images: clean, attachedAt: now })));
+  await write(code, { ...s, hasInput: true });
+  return { ok: true, images: clean.length };
+}
+
+/** Claude: reads the input package of a session by its code. `_images` travel as image content. */
+export async function getSessionInput({ session_code } = {}, now = Date.now()) {
+  if (!validCode(session_code)) return { found: false, error: "BAD_CODE", message: "session_code must look like HCM-XXXX-XXXX-XXXX, exactly as written in the user's request." };
+  const s = await read(session_code);
+  if (!s || now >= s.expiresAt) return { found: false, error: "NO_SESSION", message: "No Studio session with that code (it may have expired after 2 hours)." };
+  if (!s.hasInput) return { found: false, error: "NO_INPUT", message: "The Studio did not attach an analysis to this session. Work from what the user wrote." };
+  const bytes = await (await store()).get(inputPath(session_code)).catch(() => null);
+  if (!bytes) return { found: false, error: "NO_INPUT", message: "The analysis for this session is no longer available." };
+  let v;
+  try { v = JSON.parse(new TextDecoder().decode(bytes)); } catch { return { found: false, error: "NO_INPUT", message: "The analysis for this session could not be read." }; }
+  const images = Array.isArray(v.images) ? v.images : [];
+  return {
+    found: true,
+    tool: s.tool,
+    summary: v.summary,
+    images: images.map((im, i) => ({ index: i + 1, caption: im.caption })),
+    _images: images.map(im => im.data),
+  };
+}
+
 /** Cron: deletes expired sessions. */
 export async function sweepSessions(now = Date.now()) {
   const s = await store();
@@ -94,6 +160,18 @@ export async function sweepSessions(now = Date.now()) {
     for (const b of page.blobs) {
       if (!b.pathname.startsWith("sessions/")) continue;
       const v = await read(b.pathname.slice(9, -5));
+      if (!v || now >= v.expiresAt) old.push(b.pathname);
+    }
+    if (old.length) { await s.del(old); n += old.length; }
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  cursor = undefined;
+  do {
+    const page = await s.list(cursor, "session-input/");
+    const old = [];
+    for (const b of page.blobs) {
+      if (!b.pathname.startsWith("session-input/")) continue;
+      const v = await read(b.pathname.slice(14, -5));
       if (!v || now >= v.expiresAt) old.push(b.pathname);
     }
     if (old.length) { await s.del(old); n += old.length; }
