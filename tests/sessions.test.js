@@ -85,3 +85,47 @@ test("deliver_error: the Studio sees failed with code and message; not after del
   assert.equal(r2.reported, true);
   assert.equal((await pollSession(code, key)).code, "OTHER");
 });
+
+test("input package: only the key holder attaches it; Claude reads it by code with images", async () => {
+  const { attachInput, getSessionInput, INPUT_MAX_IMAGES } = await import("../src/sessions.js");
+  files.clear();
+  const jpeg = "/9j/" + "A".repeat(400);
+  await openSession({ code: CODE, keyHash: hashKey(KEY), tool: "clonar-tiktok" });
+  assert.equal((await getSessionInput({ session_code: CODE })).error, "NO_INPUT");
+  assert.equal((await attachInput({ code: CODE, key: "x".repeat(40), summary: {}, images: [] })).error, "NOT_FOUND");
+  assert.equal((await attachInput({ code: CODE, key: KEY, summary: [], images: [] })).error, "BAD_SUMMARY");
+  assert.equal((await attachInput({ code: CODE, key: KEY, summary: {}, images: [{ data: "iVBORw0KGgo=" }] })).error, "BAD_IMAGE");
+  assert.equal((await attachInput({ code: CODE, key: KEY, summary: {}, images: Array(INPUT_MAX_IMAGES + 1).fill({ data: jpeg }) })).error, "TOO_MANY_IMAGES");
+  assert.equal((await attachInput({ code: CODE, key: KEY, summary: {}, images: [{ data: "/9j/" + "A".repeat(500 * 1024) }] })).error, "IMAGE_TOO_LARGE");
+  const ok = await attachInput({ code: CODE, key: KEY, summary: { duration: 12, scenes: [{ start: 0, end: 4 }] }, images: [{ data: jpeg, caption: "Escena 1" }] });
+  assert.deepEqual(ok, { ok: true, images: 1 });
+  const got = await getSessionInput({ session_code: CODE });
+  assert.equal(got.found, true);
+  assert.equal(got.summary.duration, 12);
+  assert.deepEqual(got.images, [{ index: 1, caption: "Escena 1" }]);
+  assert.deepEqual(got._images, [jpeg]);
+
+  let raw; const res = { statusCode: 200, setHeader() {}, end(x) { raw = x; } };
+  await handler({ method: "POST", headers: {}, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_session_input", arguments: { session_code: CODE } } } }, res);
+  const r = JSON.parse(raw).result;
+  assert.equal(r.isError, false);
+  assert.deepEqual(r.content.map(c => c.type), ["text", "image"]);
+  assert.equal(r.structuredContent._images, undefined);
+
+  await deliverResult({ session_code: CODE, download: newId() });
+  assert.equal((await attachInput({ code: CODE, key: KEY, summary: {}, images: [] })).error, "CLOSED");
+  const later = Date.now() + SESSION_TTL_MS + 1;
+  assert.equal(await sweepSessions(later), 2);
+  assert.equal(files.size, 0);
+});
+
+test("HTTP PUT attaches the input; deliver_error accepts NOT_MOTION_GRAPHIC", async () => {
+  const { deliverError } = await import("../src/sessions.js");
+  files.clear();
+  const call = async req => { const res = { statusCode: 200, headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(x) { this.body = x; } }; await session(req, res); return { ...res, json: res.body ? JSON.parse(res.body) : null }; };
+  await openSession({ code: CODE, keyHash: hashKey(KEY) });
+  assert.equal((await call({ method: "PUT", body: { code: CODE, key: "x".repeat(40), summary: {} } })).statusCode, 404);
+  assert.equal((await call({ method: "PUT", body: JSON.stringify({ code: CODE, key: KEY, summary: { a: 1 }, images: [] }) })).statusCode, 200);
+  assert.equal((await deliverError({ session_code: CODE, code: "NOT_MOTION_GRAPHIC", message: "Es un video grabado." })).reported, true);
+  assert.equal((await pollSession(CODE, KEY)).code, "NOT_MOTION_GRAPHIC");
+});
